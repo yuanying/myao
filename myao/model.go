@@ -34,8 +34,7 @@ func New() *Myao {
 		Organization: utils.ToPtr(openAIOrganizationID),
 	})
 	return &Myao{
-		openAI:   openAI,
-		memories: []api.Message{{Role: "system", Content: system}},
+		openAI: openAI,
 	}
 }
 
@@ -49,12 +48,16 @@ func (m *Myao) Remember(role, content string) {
 	}
 }
 
+func (m *Myao) Memories() []api.Message {
+	return append([]api.Message{{Role: "system", Content: system}}, m.memories...)
+}
+
 func (m *Myao) Reply(content string) (string, error) {
 	m.Remember("user", content)
 
 	output, err := m.openAI.ChatCompletionsV1(&api.ChatCompletionsV1Input{
 		Model:    utils.ToPtr("gpt-3.5-turbo"),
-		Messages: m.memories,
+		Messages: m.Memories(),
 	})
 	if err != nil {
 		klog.Errorf("OpenAI returns error: %v\n, message: %v", err, output.Error.Message)
