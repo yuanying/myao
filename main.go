@@ -50,7 +50,7 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/slack/events", slack.Handler)
+	mux.HandleFunc("/slack/events", slack.New().Handle)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, (fmt.Sprintf(rootHTMLDoc, "v0.0.1")))
 	})

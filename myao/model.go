@@ -13,12 +13,14 @@ import (
 
 var (
 	//go:embed system.txt
-	system            string
-	openAIAccessToken string
+	system               string
+	openAIAccessToken    string
+	openAIOrganizationID string
 )
 
 func init() {
 	openAIAccessToken = os.Getenv("OPENAI_ACCESS_TOKEN")
+	openAIOrganizationID = os.Getenv("OPENAI_ORG_ID")
 }
 
 type Myao struct {
@@ -28,7 +30,8 @@ type Myao struct {
 
 func New() *Myao {
 	openAI := api.New(&config.Configuration{
-		ApiKey: utils.ToPtr(openAIAccessToken),
+		ApiKey:       utils.ToPtr(openAIAccessToken),
+		Organization: utils.ToPtr(openAIOrganizationID),
 	})
 	return &Myao{
 		openAI:   openAI,
@@ -54,7 +57,7 @@ func (m *Myao) Reply(content string) (string, error) {
 		Messages: m.memories,
 	})
 	if err != nil {
-		klog.Errorf("OpenAI returns error: %v", err)
+		klog.Errorf("OpenAI returns error: %v\n, message: %v", err, output.Error.Message)
 		return "", err
 	}
 
