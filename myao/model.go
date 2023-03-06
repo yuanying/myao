@@ -36,15 +36,22 @@ func New() *Myao {
 	}
 }
 
-func (m *Myao) Reply(content string) (string, error) {
-	memories := append(m.memories, api.Message{
-		Role:    "user",
+func (m *Myao) Remember(role, content string) {
+	m.memories = append(m.memories, api.Message{
+		Role:    role,
 		Content: content,
 	})
+	if len(m.memories) > 20 {
+		m.memories = m.memories[1:]
+	}
+}
+
+func (m *Myao) Reply(content string) (string, error) {
+	m.Remember("user", content)
 
 	output, err := m.openAI.ChatCompletionsV1(&api.ChatCompletionsV1Input{
 		Model:    utils.ToPtr("gpt-3.5-turbo"),
-		Messages: memories,
+		Messages: m.memories,
 	})
 	if err != nil {
 		klog.Errorf("OpenAI returns error: %v", err)
@@ -52,10 +59,7 @@ func (m *Myao) Reply(content string) (string, error) {
 	}
 
 	reply := output.Choices[0].Message
-	m.memories = append(m.memories, api.Message{
-		Role:    reply.Role,
-		Content: reply.Content,
-	})
+	m.Remember(reply.Role, reply.Content)
 
 	return reply.Content, nil
 }
