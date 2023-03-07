@@ -53,8 +53,6 @@ func (m *Myao) Memories() []api.Message {
 }
 
 func (m *Myao) Reply(content string) (string, error) {
-	m.Remember("user", content)
-
 	output, err := m.openAI.ChatCompletionsV1(&api.ChatCompletionsV1Input{
 		Model:    utils.ToPtr("gpt-3.5-turbo"),
 		Messages: m.Memories(),

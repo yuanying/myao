@@ -1,11 +1,14 @@
 package slack
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
@@ -25,18 +28,19 @@ func init() {
 }
 
 type Handler struct {
-	myao *myao.Myao
+	myao   *myao.Myao
+	slack  *slack.Client
+	cancel context.CancelFunc
 }
 
 func New() *Handler {
 	return &Handler{
-		myao: myao.New(),
+		myao:  myao.New(),
+		slack: slack.New(slackBotToken),
 	}
 }
 
 func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
-	api := slack.New(slackBotToken)
-
 	body, err := Verify(r.Header, r.Body)
 	if err != nil {
 		klog.Errorf("Verify error: %v", err)
@@ -70,19 +74,50 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		switch event := innerEvent.Data.(type) {
 		case *slackevents.AppMentionEvent:
 			klog.Infof("AppMentionEvent: %v", event.Text)
-			go func() {
-				reply, err := h.myao.Reply(event.Text)
-				if err != nil {
-					klog.Errorf("Myao reply error: %v", err)
-					return
-				}
-				if _, _, err := api.PostMessage(event.Channel, slack.MsgOptionText(reply, false)); err != nil {
-					klog.Errorf("Slack post message error: %v", err)
-					return
-				}
-			}()
 		case *slackevents.MessageEvent:
 			klog.Infof("MessageEvent: \n bot->%v\n user-> %v\n text -> %v", event.BotID, event.User, event.Text)
+			h.Reply(event)
+		}
+	}
+}
+
+func (h *Handler) Reply(event *slackevents.MessageEvent) {
+	if event.BotID != "" {
+		return
+	}
+	if event.Text == "" {
+		return
+	}
+
+	if h.cancel != nil {
+		h.cancel()
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	h.cancel = cancel
+
+	go h.reply(ctx, event.Channel, event.Text)
+}
+
+func (h *Handler) reply(ctx context.Context, channel, text string) {
+	h.myao.Remember("user", text)
+	seed := time.Now().UnixNano()
+	rand.Seed(seed)
+	sec := rand.Int63n(180)
+	klog.Infof("Waiting reply %v seconds", sec)
+
+	select {
+	case <-ctx.Done():
+		klog.Infof("Skip message: %v", text)
+	case <-time.After(time.Duration(sec) * time.Second):
+		reply, err := h.myao.Reply(text)
+		if err != nil {
+			klog.Errorf("Myao reply error: %v", err)
+			return
+		}
+		if _, _, err := h.slack.PostMessage(channel, slack.MsgOptionText(reply, false)); err != nil {
+			klog.Errorf("Slack post message error: %v", err)
+			return
 		}
 	}
 }
