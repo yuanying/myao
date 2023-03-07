@@ -38,11 +38,18 @@ type Handler struct {
 	cancel context.CancelFunc
 }
 
-func New(name string) *Handler {
-	return &Handler{
-		myao:  myao.New(name),
-		slack: slack.New(slackBotToken),
+func New(name string) (*Handler, error) {
+	slack := slack.New(slackBotToken)
+	bot, err := slack.AuthTest()
+	if err != nil {
+		return nil, err
 	}
+	myao := myao.New(name)
+	myao.SetUserID(bot.UserID)
+	return &Handler{
+		myao:  myao,
+		slack: slack,
+	}, nil
 }
 
 func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +85,7 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		innerEvent := event.InnerEvent
 		switch event := innerEvent.Data.(type) {
 		case *slackevents.AppMentionEvent:
-			klog.Infof("AppMentionEvent: %v", event.Text)
+			klog.Infof("AppMentionEvent: \n user ->%v\n text -> %v", event.User, event.Text)
 		case *slackevents.MessageEvent:
 			klog.Infof("MessageEvent: \n bot->%v\n user-> %v\n text -> %v", event.BotID, event.User, event.Text)
 			h.Reply(event)
@@ -111,7 +118,7 @@ func (h *Handler) reply(ctx context.Context, channel, text string) {
 	seed := time.Now().UnixNano()
 	sec := 0
 
-	if !strings.Contains(text, h.myao.Name) {
+	if !strings.Contains(text, h.myao.Name) && !strings.Contains(text, fmt.Sprintf("@%v", h.myao.UserID())) {
 		rand.Seed(seed)
 		sec = rand.Intn(180)
 		klog.Infof("Waiting reply %v seconds", sec)

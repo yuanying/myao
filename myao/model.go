@@ -31,6 +31,9 @@ type Myao struct {
 	// mu protects memories from concurrent access.
 	mu       sync.RWMutex
 	memories []api.Message
+
+	muu    sync.RWMutex
+	userID string
 }
 
 func New(name string) *Myao {
@@ -42,6 +45,21 @@ func New(name string) *Myao {
 		Name:   name,
 		openAI: openAI,
 	}
+}
+
+func (m *Myao) SetUserID(id string) {
+	m.muu.Lock()
+	defer m.muu.Unlock()
+
+	klog.Infof("UserID is set: %v", id)
+	m.userID = id
+}
+
+func (m *Myao) UserID() string {
+	m.muu.RLock()
+	defer m.muu.RUnlock()
+
+	return m.userID
 }
 
 func (m *Myao) Remember(role, content string) {

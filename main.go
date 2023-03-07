@@ -52,7 +52,12 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/slack/events", slack.New(name).Handle)
+	slackHandler, err := slack.New(name)
+	if err != nil {
+		klog.Errorf("slackHandler initialization fails: %v", err)
+		return
+	}
+	mux.HandleFunc("/slack/events", slackHandler.Handle)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, (fmt.Sprintf(rootHTMLDoc, "v0.0.1")))
 	})
