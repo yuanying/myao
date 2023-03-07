@@ -30,6 +30,7 @@ const (
 var (
 	shutdownDelayPeriod time.Duration
 	shutdownGracePeriod time.Duration
+	name                string
 	bindAddress         string
 )
 
@@ -37,6 +38,7 @@ func init() {
 	flag.CommandLine.VisitAll(func(f *flag.Flag) {
 		pflag.CommandLine.AddGoFlag(f)
 	})
+	pflag.StringVar(&name, "name", "ミャオ", "The name of this ChatBot.")
 	pflag.StringVar(&bindAddress, "bind-address", ":8080", "Address on which to expose web interface.")
 	pflag.DurationVar(&shutdownDelayPeriod, "shutdown-wait-period", 1*time.Second, "set the time (in seconds) that the server will wait before initiating shutdown")
 	pflag.DurationVar(&shutdownGracePeriod, "shutdown-grace-period", 5*time.Second, "set the time (in seconds) that the server will wait shutdown")
@@ -50,7 +52,7 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/slack/events", slack.New().Handle)
+	mux.HandleFunc("/slack/events", slack.New(name).Handle)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, (fmt.Sprintf(rootHTMLDoc, "v0.0.1")))
 	})

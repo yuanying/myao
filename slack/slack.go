@@ -8,6 +8,8 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/slack-go/slack"
@@ -28,14 +30,17 @@ func init() {
 }
 
 type Handler struct {
-	myao   *myao.Myao
-	slack  *slack.Client
+	myao  *myao.Myao
+	slack *slack.Client
+
+	// mu protects cancel from concurrent access.
+	mu     sync.Mutex
 	cancel context.CancelFunc
 }
 
-func New() *Handler {
+func New(name string) *Handler {
 	return &Handler{
-		myao:  myao.New(),
+		myao:  myao.New(name),
 		slack: slack.New(slackBotToken),
 	}
 }
@@ -89,12 +94,14 @@ func (h *Handler) Reply(event *slackevents.MessageEvent) {
 		return
 	}
 
+	h.mu.Lock()
 	if h.cancel != nil {
 		h.cancel()
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	h.cancel = cancel
+	h.mu.Unlock()
 
 	go h.reply(ctx, event.Channel, event.Text)
 }
@@ -102,9 +109,13 @@ func (h *Handler) Reply(event *slackevents.MessageEvent) {
 func (h *Handler) reply(ctx context.Context, channel, text string) {
 	h.myao.Remember("user", text)
 	seed := time.Now().UnixNano()
-	rand.Seed(seed)
-	sec := rand.Int63n(180)
-	klog.Infof("Waiting reply %v seconds", sec)
+	sec := 0
+
+	if !strings.Contains(text, h.myao.Name) {
+		rand.Seed(seed)
+		sec = rand.Intn(180)
+		klog.Infof("Waiting reply %v seconds", sec)
+	}
 
 	select {
 	case <-ctx.Done():
