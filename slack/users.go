@@ -38,7 +38,7 @@ func NewUsers(client *slack.Client) (*Users, error) {
 
 func (u *Users) Text(event *slackevents.MessageEvent) string {
 	if user, exist := u.users[event.User]; exist {
-		return fmt.Sprintf("%v: %v", user, event.Text)
+		return fmt.Sprintf("%v: 「%v」", user, event.Text)
 	}
 	return event.Text
 }

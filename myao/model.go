@@ -16,7 +16,13 @@ import (
 
 var (
 	//go:embed system.txt
-	system               string
+	system string
+	//go:embed history.txt
+	history string
+	//go:embed summarize.txt
+	summarize string
+	//go:embed error.txt
+	errorText            string
 	openAIAccessToken    string
 	openAIOrganizationID string
 )
@@ -34,6 +40,7 @@ type Myao struct {
 	// mu protects memories from concurrent access.
 	mu       sync.RWMutex
 	memories []api.Message
+	summary  string
 
 	muu    sync.RWMutex
 	userID string
@@ -81,25 +88,52 @@ func (m *Myao) Remember(role, content string) {
 		Role:    role,
 		Content: content,
 	})
+
 	if len(m.memories) > 20 {
-		m.memories = m.memories[1:]
+		klog.Infof("Trying compress memories")
+		m.summarize()
 	}
+}
+
+func (m *Myao) summarize() {
+	summaryText := summarize
+	if m.summary != "" {
+		historyText := fmt.Sprintf(history, m.summary)
+		summaryText = summaryText + historyText
+	}
+	output, err := m.openAI.ChatCompletionsV1(&api.ChatCompletionsV1Input{
+		Model:    utils.ToPtr("gpt-3.5-turbo"),
+		Messages: append([]api.Message{{Role: "system", Content: summaryText}}, m.memories[0:10]...),
+	})
+	if err != nil {
+		klog.Errorf("OpenAI returns error: %v\n, message: %v", err, output.Error.Message)
+		return
+	}
+	m.summary = output.Choices[0].Message.Content
+	klog.Infof("longtermMemory is set: %v", m.summary)
+	m.memories = m.memories[10:]
 }
 
 func (m *Myao) Memories() []api.Message {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return append([]api.Message{{Role: "system", Content: m.systemText}}, m.memories...)
+	systemText := m.systemText
+	if m.summary != "" {
+		historyText := fmt.Sprintf(history, m.summary)
+		systemText = systemText + historyText
+	}
+	return append([]api.Message{{Role: "system", Content: systemText}}, m.memories...)
 }
 
 func (m *Myao) Reply(content string) (string, error) {
+	klog.Infof("Requesting chat completions...: %v", content)
 	output, err := m.openAI.ChatCompletionsV1(&api.ChatCompletionsV1Input{
 		Model:    utils.ToPtr("gpt-3.5-turbo"),
 		Messages: m.Memories(),
 	})
 	if err != nil {
 		klog.Errorf("OpenAI returns error: %v\n, message: %v", err, output.Error.Message)
-		return "", err
+		return errorText, nil
 	}
 
 	reply := output.Choices[0].Message
