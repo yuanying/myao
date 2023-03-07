@@ -2,7 +2,9 @@ package myao
 
 import (
 	_ "embed"
+	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/ieee0824/gopenai-api/api"
@@ -25,8 +27,9 @@ func init() {
 }
 
 type Myao struct {
-	Name   string
-	openAI api.OpenAIAPIIface
+	Name       string
+	openAI     api.OpenAIAPIIface
+	systemText string
 
 	// mu protects memories from concurrent access.
 	mu       sync.RWMutex
@@ -36,14 +39,23 @@ type Myao struct {
 	userID string
 }
 
-func New(name string) *Myao {
+func New(name string, users map[string]string) *Myao {
 	openAI := api.New(&config.Configuration{
 		ApiKey:       utils.ToPtr(openAIAccessToken),
 		Organization: utils.ToPtr(openAIOrganizationID),
 	})
+
+	var sb strings.Builder
+	for _, v := range users {
+		sb.WriteString(fmt.Sprintf("- %v\n", v))
+	}
+	systemText := fmt.Sprintf(system, sb.String())
+	klog.Infof("SystemText:\n%v", systemText)
+
 	return &Myao{
-		Name:   name,
-		openAI: openAI,
+		Name:       name,
+		openAI:     openAI,
+		systemText: systemText,
 	}
 }
 
@@ -77,7 +89,7 @@ func (m *Myao) Remember(role, content string) {
 func (m *Myao) Memories() []api.Message {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return append([]api.Message{{Role: "system", Content: system}}, m.memories...)
+	return append([]api.Message{{Role: "system", Content: m.systemText}}, m.memories...)
 }
 
 func (m *Myao) Reply(content string) (string, error) {

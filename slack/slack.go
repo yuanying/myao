@@ -32,6 +32,7 @@ func init() {
 type Handler struct {
 	myao  *myao.Myao
 	slack *slack.Client
+	users *Users
 
 	// mu protects cancel from concurrent access.
 	mu     sync.Mutex
@@ -44,9 +45,14 @@ func New(name string) (*Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	myao := myao.New(name)
+	users, err := NewUsers(slack)
+	if err != nil {
+		return nil, err
+	}
+	myao := myao.New(name, users.users)
 	myao.SetUserID(bot.UserID)
 	return &Handler{
+		users: users,
 		myao:  myao,
 		slack: slack,
 	}, nil
@@ -110,7 +116,7 @@ func (h *Handler) Reply(event *slackevents.MessageEvent) {
 	h.cancel = cancel
 	h.mu.Unlock()
 
-	go h.reply(ctx, event.Channel, event.Text)
+	go h.reply(ctx, event.Channel, h.users.Text(event))
 }
 
 func (h *Handler) reply(ctx context.Context, channel, text string) {
