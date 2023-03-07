@@ -57,6 +57,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: false
           tags: ${{ steps.prep.outputs.tags }}
+          provenance: false
       -
         name: Docker Login
         if: success() && startsWith(github.ref, 'refs/tags/v')
@@ -76,3 +77,4 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.prep.outputs.tags }}
+          provenance: false
