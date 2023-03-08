@@ -89,6 +89,7 @@ func (m *Myao) Remember(role, content string) {
 		Content: content,
 	})
 
+	klog.Infof("Total memories: %v", len(m.memories))
 	if len(m.memories) > 20 {
 		klog.Infof("Trying compress memories")
 		m.summarize()
@@ -131,6 +132,9 @@ func (m *Myao) Reply(content string) (string, error) {
 		Model:    utils.ToPtr("gpt-3.5-turbo"),
 		Messages: m.Memories(),
 	})
+	if output.Usage != nil {
+		klog.Infof("Usage: prompt %v tokens, completions %v tokens", output.Usage.PromptTokens, output.Usage.CompletionTokens)
+	}
 	if err != nil {
 		klog.Errorf("OpenAI returns error: %v\n, message: %v", err, output.Error.Message)
 		return errorText, nil

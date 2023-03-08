@@ -91,9 +91,9 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		innerEvent := event.InnerEvent
 		switch event := innerEvent.Data.(type) {
 		case *slackevents.AppMentionEvent:
-			klog.Infof("AppMentionEvent: \n user ->%v\n text -> %v", event.User, event.Text)
+			klog.Infof("AppMentionEvent: user -> %v,  text -> %v", event.User, event.Text)
 		case *slackevents.MessageEvent:
-			klog.Infof("MessageEvent: \n bot->%v\n user-> %v\n text -> %v", event.BotID, event.User, event.Text)
+			klog.Infof("MessageEvent: bot-> %v, user-> %v, text -> %v", event.BotID, event.User, event.Text)
 			h.Reply(event)
 		}
 	}
@@ -139,6 +139,7 @@ func (h *Handler) reply(ctx context.Context, channel, text string) {
 			klog.Errorf("Myao reply error: %v", err)
 			return
 		}
+		klog.Infof("OpenAPI reply: %v", reply)
 		if _, _, err := h.slack.PostMessage(channel, slack.MsgOptionText(reply, false)); err != nil {
 			klog.Errorf("Slack post message error: %v", err)
 			return
