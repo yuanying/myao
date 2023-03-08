@@ -21,6 +21,8 @@ var (
 	history string
 	//go:embed summarize.txt
 	summarize string
+	//go:embed init.txt
+	initText string
 	//go:embed error.txt
 	errorText            string
 	openAIAccessToken    string
@@ -122,6 +124,8 @@ func (m *Myao) Memories() []api.Message {
 	if m.summary != "" {
 		historyText := fmt.Sprintf(history, m.summary)
 		systemText = systemText + historyText
+	} else {
+		systemText = systemText + initText
 	}
 	return append([]api.Message{{Role: "system", Content: systemText}}, m.memories...)
 }
