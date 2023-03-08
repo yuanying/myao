@@ -2,6 +2,7 @@ package slack
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
@@ -37,8 +38,13 @@ func NewUsers(client *slack.Client) (*Users, error) {
 }
 
 func (u *Users) Text(event *slackevents.MessageEvent) string {
+	text := event.Text
 	if user, exist := u.users[event.User]; exist {
-		return fmt.Sprintf("%v: 「%v」", user, event.Text)
+		text = fmt.Sprintf("%v: 「%v」", user, text)
 	}
-	return event.Text
+	for i, v := range u.users {
+		text = strings.Replace(text, fmt.Sprintf("<@%v>", i), v, -1)
+
+	}
+	return text
 }
