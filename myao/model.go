@@ -11,18 +11,11 @@ import (
 	"github.com/ieee0824/gopenai-api/config"
 	"k8s.io/klog/v2"
 
+	"github.com/yuanying/myao/myao/configs"
 	"github.com/yuanying/myao/utils"
 )
 
 var (
-	//go:embed system.txt
-	system string
-	//go:embed summary_order.txt
-	summaryOrder string
-	//go:embed init.txt
-	initText string
-	//go:embed error.txt
-	errorText            string
 	openAIAccessToken    string
 	openAIOrganizationID string
 )
@@ -38,9 +31,9 @@ type Memory struct {
 }
 
 type Myao struct {
-	Name       string
-	openAI     api.OpenAIAPIIface
-	systemText string
+	Name   string
+	config *configs.Config
+	openAI api.OpenAIAPIIface
 
 	// mu protects memories from concurrent access.
 	mu       sync.RWMutex
@@ -48,26 +41,33 @@ type Myao struct {
 
 	muu    sync.RWMutex
 	userID string
+
+	systemText string
 }
 
-func New(name string, users map[string]string) *Myao {
+func New(users map[string]string) (*Myao, error) {
 	openAI := api.New(&config.Configuration{
 		ApiKey:       utils.ToPtr(openAIAccessToken),
 		Organization: utils.ToPtr(openAIOrganizationID),
 	})
 
+	config, err := configs.Load("default")
+	if err != nil {
+		klog.Errorf("Failed to load config: %v", err)
+		return nil, err
+	}
+
 	var sb strings.Builder
 	for _, v := range users {
 		sb.WriteString(fmt.Sprintf("- %v\n", v))
 	}
-	systemText := fmt.Sprintf(system, sb.String())
-	klog.Infof("SystemText:\n%v", systemText)
+	systemText := fmt.Sprintf(config.SystemText, sb.String())
 
 	return &Myao{
-		Name:       name,
 		openAI:     openAI,
+		config:     config,
 		systemText: systemText,
-	}
+	}, nil
 }
 
 func (m *Myao) SetUserID(id string) {
@@ -111,7 +111,7 @@ func (m *Myao) Summarize() {
 		copy(memories, m.memories)
 		klog.Infof("Needs summary")
 		go func() {
-			m.reply(true, "system", summaryOrder)
+			m.reply(true, "system", m.config.SummaryText)
 		}()
 	}
 }
@@ -133,7 +133,7 @@ func (m *Myao) Memories() []Memory {
 	defer m.mu.RUnlock()
 	systemText := m.systemText
 	if len(m.memories) < 15 {
-		systemText = systemText + initText
+		systemText = systemText + m.config.InitText
 	}
 	system := Memory{Message: api.Message{Role: "system", Content: systemText}}
 	return append([]Memory{system}, m.memories...)
@@ -154,7 +154,7 @@ func (m *Myao) Reply(content string) (string, error) {
 
 func (m *Myao) reply(summary bool, role, content string) (string, error) {
 	klog.Infof("Requesting chat completions...: %v", content)
-	temperature := float32(1.0)
+	temperature := m.config.Temperature
 	if summary {
 		temperature = 0
 	}
@@ -177,7 +177,7 @@ func (m *Myao) reply(summary bool, role, content string) (string, error) {
 				m.forget()
 			}
 		}
-		return errorText, err
+		return m.config.ErrorText, err
 	}
 
 	reply := output.Choices[0].Message

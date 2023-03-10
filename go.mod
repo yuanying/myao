@@ -8,5 +8,6 @@ require (
 	github.com/ieee0824/gopenai-api v0.2.2 // indirect
 	github.com/slack-go/slack v0.12.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.90.1 // indirect
 )

@@ -39,7 +39,7 @@ type Handler struct {
 	cancel context.CancelFunc
 }
 
-func New(name string) (*Handler, error) {
+func New() (*Handler, error) {
 	slack := slack.New(slackBotToken)
 	bot, err := slack.AuthTest()
 	if err != nil {
@@ -49,7 +49,10 @@ func New(name string) (*Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	myao := myao.New(name, users.users)
+	myao, err := myao.New(users.users)
+	if err != nil {
+		return nil, err
+	}
 	myao.SetUserID(bot.UserID)
 	return &Handler{
 		users: users,
