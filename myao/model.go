@@ -167,13 +167,16 @@ func (m *Myao) reply(summary bool, role, content string) (string, error) {
 	if output.Usage != nil {
 		klog.Infof("Usage: prompt %v tokens, completions %v tokens", output.Usage.PromptTokens, output.Usage.CompletionTokens)
 		if output.Usage.PromptTokens > 3072 {
-			m.mu.Lock()
-			m.memories = m.memories[2:]
-			m.mu.Unlock()
+			m.forget()
 		}
 	}
 	if err != nil {
-		klog.Errorf("OpenAI returns error: %v\n, message: %v", err, output.Error.Message)
+		if output.Error != nil {
+			klog.Errorf("OpenAI returns error: %v\n, message: %v", err, output.Error.Message)
+			if output.Error.Code == "context_length_exceeded" {
+				m.forget()
+			}
+		}
 		return errorText, err
 	}
 
@@ -185,4 +188,11 @@ func (m *Myao) reply(summary bool, role, content string) (string, error) {
 	}
 
 	return reply.Content, nil
+}
+
+func (m *Myao) forget() {
+	klog.Infof("Try forget the old memries")
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.memories = m.memories[5:]
 }
