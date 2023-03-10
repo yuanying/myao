@@ -116,15 +116,14 @@ func (h *Handler) Reply(event *slackevents.MessageEvent) {
 	h.cancel = cancel
 	h.mu.Unlock()
 
-	go h.reply(ctx, event.Channel, h.users.Text(event))
+	go h.reply(ctx, event.Channel, h.users.Text(h.myao, event))
 }
 
 func (h *Handler) reply(ctx context.Context, channel, text string) {
-	h.myao.Remember("user", text)
-	seed := time.Now().UnixNano()
 	sec := 0
 
 	if !strings.Contains(text, h.myao.Name) && !strings.Contains(text, fmt.Sprintf("@%v", h.myao.UserID())) {
+		seed := time.Now().UnixNano()
 		rand.Seed(seed)
 		sec = rand.Intn(180)
 		klog.Infof("Waiting reply %v seconds", sec)
@@ -132,11 +131,16 @@ func (h *Handler) reply(ctx context.Context, channel, text string) {
 
 	select {
 	case <-ctx.Done():
+		h.myao.Remember("user", text)
 		klog.Infof("Skip message: %v", text)
 	case <-time.After(time.Duration(sec) * time.Second):
 		reply, err := h.myao.Reply(text)
 		if err != nil {
 			klog.Errorf("Myao reply error: %v", err)
+			if _, _, err := h.slack.PostMessage(channel, slack.MsgOptionText(reply, false)); err != nil {
+				klog.Errorf("Slack post message error: %v", err)
+				return
+			}
 			return
 		}
 		klog.Infof("OpenAPI reply: %v", reply)

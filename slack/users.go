@@ -6,6 +6,7 @@ import (
 
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
+	"github.com/yuanying/myao/myao"
 	"k8s.io/klog/v2"
 )
 
@@ -37,14 +38,14 @@ func NewUsers(client *slack.Client) (*Users, error) {
 	}, nil
 }
 
-func (u *Users) Text(event *slackevents.MessageEvent) string {
+func (u *Users) Text(myao *myao.Myao, event *slackevents.MessageEvent) string {
 	text := event.Text
 	if user, exist := u.users[event.User]; exist {
 		text = fmt.Sprintf("%v: 「%v」", user, text)
 	}
 	for i, v := range u.users {
 		text = strings.Replace(text, fmt.Sprintf("<@%v>", i), v, -1)
-
 	}
+	text = strings.Replace(text, fmt.Sprintf("<@%v>", myao.UserID()), myao.Name, -1)
 	return text
 }
