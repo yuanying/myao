@@ -92,6 +92,7 @@ func (m *Myao) Remember(role, content string) {
 func (m *Myao) remember(summary bool, role, content string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	klog.Infof("Memories: %v", len(m.memories))
 	m.memories = append(m.memories, Memory{
 		summary: summary,
 		Message: api.Message{
@@ -99,20 +100,19 @@ func (m *Myao) remember(summary bool, role, content string) {
 			Content: content,
 		},
 	})
+}
 
-	if role != "user" && summary != true && m.needsSummary() {
+func (m *Myao) Summarize() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.needsSummary() {
 		memories := make([]Memory, len(m.memories))
 		copy(memories, m.memories)
 		klog.Infof("Needs summary")
 		go func() {
 			m.reply(true, "system", summaryOrder)
 		}()
-	}
-
-	klog.Infof("Total memories: %v", len(m.memories))
-	if len(m.memories) > 20 {
-		// m.summarize()
-		m.memories = m.memories[len(m.memories)-20:]
 	}
 }
 
@@ -154,12 +154,23 @@ func (m *Myao) Reply(content string) (string, error) {
 
 func (m *Myao) reply(summary bool, role, content string) (string, error) {
 	klog.Infof("Requesting chat completions...: %v", content)
+	temperature := float32(1.0)
+	if summary {
+		temperature = 0
+	}
+
 	output, err := m.openAI.ChatCompletionsV1(&api.ChatCompletionsV1Input{
-		Model:    utils.ToPtr("gpt-3.5-turbo"),
-		Messages: toMessages(m.Memories()),
+		Model:       utils.ToPtr("gpt-3.5-turbo"),
+		Messages:    append(toMessages(m.Memories()), api.Message{Role: role, Content: content}),
+		Temperature: utils.ToPtr(temperature),
 	})
 	if output.Usage != nil {
 		klog.Infof("Usage: prompt %v tokens, completions %v tokens", output.Usage.PromptTokens, output.Usage.CompletionTokens)
+		if output.Usage.PromptTokens > 3072 {
+			m.mu.Lock()
+			m.memories = m.memories[2:]
+			m.mu.Unlock()
+		}
 	}
 	if err != nil {
 		klog.Errorf("OpenAI returns error: %v\n, message: %v", err, output.Error.Message)
@@ -167,9 +178,7 @@ func (m *Myao) reply(summary bool, role, content string) (string, error) {
 	}
 
 	reply := output.Choices[0].Message
-	if !summary {
-		m.remember(summary, role, content)
-	}
+	m.remember(summary, role, content)
 	m.remember(summary, reply.Role, reply.Content)
 	if summary {
 		klog.Infof("Summary: %v", reply.Content)
