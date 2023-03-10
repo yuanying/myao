@@ -64,6 +64,7 @@ func New(users map[string]string) (*Myao, error) {
 	systemText := fmt.Sprintf(config.SystemText, sb.String())
 
 	return &Myao{
+		Name:       config.Name,
 		openAI:     openAI,
 		config:     config,
 		systemText: systemText,
@@ -166,15 +167,19 @@ func (m *Myao) reply(summary bool, role, content string) (string, error) {
 	})
 	if output.Usage != nil {
 		klog.Infof("Usage: prompt %v tokens, completions %v tokens", output.Usage.PromptTokens, output.Usage.CompletionTokens)
-		if output.Usage.PromptTokens > 3072 {
-			m.forget()
+		if output.Usage.PromptTokens > 3584 {
+			m.forget(5)
+		} else if output.Usage.PromptTokens > 3328 {
+			m.forget(4)
+		} else if output.Usage.PromptTokens > 3072 {
+			m.forget(3)
 		}
 	}
 	if err != nil {
 		if output.Error != nil {
 			klog.Errorf("OpenAI returns error: %v\n, message: %v", err, output.Error.Message)
 			if output.Error.Code == "context_length_exceeded" {
-				m.forget()
+				m.forget(8)
 			}
 		}
 		return m.config.ErrorText, err
@@ -190,9 +195,12 @@ func (m *Myao) reply(summary bool, role, content string) (string, error) {
 	return reply.Content, nil
 }
 
-func (m *Myao) forget() {
+func (m *Myao) forget(num int) {
 	klog.Infof("Try forget the old memries")
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.memories = m.memories[5:]
+	if num > len(m.memories) {
+		num = len(m.memories)
+	}
+	m.memories = m.memories[num:]
 }

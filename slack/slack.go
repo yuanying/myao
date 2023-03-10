@@ -77,6 +77,8 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch event.Type {
+	case slackevents.AppRateLimited:
+		klog.Errorf("Slack events are rate limted: %v", event)
 	case slackevents.URLVerification:
 		var res *slackevents.ChallengeResponse
 		if err := json.Unmarshal(body, &res); err != nil {
