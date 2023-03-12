@@ -30,16 +30,17 @@ func init() {
 }
 
 type Handler struct {
-	myao  *myao.Myao
-	slack *slack.Client
-	users *Users
+	myao                *myao.Myao
+	slack               *slack.Client
+	users               *Users
+	maxDeplyReplyPeriod time.Duration
 
 	// mu protects cancel from concurrent access.
 	mu     sync.Mutex
 	cancel context.CancelFunc
 }
 
-func New() (*Handler, error) {
+func New(maxDeplyReplyPeriod time.Duration) (*Handler, error) {
 	slack := slack.New(slackBotToken)
 	bot, err := slack.AuthTest()
 	if err != nil {
@@ -55,9 +56,10 @@ func New() (*Handler, error) {
 	}
 	myao.SetUserID(bot.UserID)
 	return &Handler{
-		users: users,
-		myao:  myao,
-		slack: slack,
+		users:               users,
+		myao:                myao,
+		slack:               slack,
+		maxDeplyReplyPeriod: maxDeplyReplyPeriod,
 	}, nil
 }
 
@@ -125,12 +127,12 @@ func (h *Handler) Reply(event *slackevents.MessageEvent) {
 }
 
 func (h *Handler) reply(ctx context.Context, channel, text string) {
-	sec := 0
+	sec := 5
 
 	if !strings.Contains(text, h.myao.Name) && !strings.Contains(text, fmt.Sprintf("@%v", h.myao.UserID())) {
 		seed := time.Now().UnixNano()
 		rand.Seed(seed)
-		sec = rand.Intn(180)
+		sec = rand.Intn(int(h.maxDeplyReplyPeriod.Seconds()))
 		klog.Infof("Waiting reply %v seconds", sec)
 	}
 

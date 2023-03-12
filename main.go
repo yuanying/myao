@@ -30,6 +30,7 @@ const (
 var (
 	shutdownDelayPeriod time.Duration
 	shutdownGracePeriod time.Duration
+	maxDelayReplyPeriod time.Duration
 	bindAddress         string
 )
 
@@ -38,6 +39,7 @@ func init() {
 		pflag.CommandLine.AddGoFlag(f)
 	})
 	pflag.StringVar(&bindAddress, "bind-address", ":8080", "Address on which to expose web interface.")
+	pflag.DurationVar(&maxDelayReplyPeriod, "max-delay-reply-period", 600*time.Second, "set the time (in seconds) that the myao will wait before replying")
 	pflag.DurationVar(&shutdownDelayPeriod, "shutdown-wait-period", 1*time.Second, "set the time (in seconds) that the server will wait before initiating shutdown")
 	pflag.DurationVar(&shutdownGracePeriod, "shutdown-grace-period", 5*time.Second, "set the time (in seconds) that the server will wait shutdown")
 	pflag.Parse()
@@ -50,7 +52,7 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	slackHandler, err := slack.New()
+	slackHandler, err := slack.New(maxDelayReplyPeriod)
 	if err != nil {
 		klog.Errorf("slackHandler initialization fails: %v", err)
 		return
