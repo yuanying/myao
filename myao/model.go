@@ -186,7 +186,9 @@ func (m *Myao) reply(summary bool, role, content string) (string, error) {
 	}
 
 	reply := output.Choices[0].Message
-	m.remember(summary, role, content)
+	if summary != true {
+		m.remember(summary, role, content)
+	}
 	m.remember(summary, reply.Role, reply.Content)
 	if summary {
 		klog.Infof("Summary: %v", reply.Content)
