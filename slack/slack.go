@@ -40,7 +40,7 @@ type Handler struct {
 	cancel context.CancelFunc
 }
 
-func New(maxDeplyReplyPeriod time.Duration) (*Handler, error) {
+func New(character string, maxDeplyReplyPeriod time.Duration) (*Handler, error) {
 	slack := slack.New(slackBotToken)
 	bot, err := slack.AuthTest()
 	if err != nil {
@@ -50,7 +50,7 @@ func New(maxDeplyReplyPeriod time.Duration) (*Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	myao, err := myao.New(users.users)
+	myao, err := myao.New(character, users.users)
 	if err != nil {
 		return nil, err
 	}

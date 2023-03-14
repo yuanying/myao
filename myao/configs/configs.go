@@ -9,6 +9,8 @@ import (
 var (
 	//go:embed default.yaml
 	defaultConfig []byte
+	//go:embed english_teacher.yaml
+	englishTeacherConfig []byte
 )
 
 type Config struct {
@@ -22,7 +24,14 @@ type Config struct {
 
 func Load(character string) (*Config, error) {
 	config := Config{}
-	err := yaml.Unmarshal(defaultConfig, &config)
+	configYaml := defaultConfig
+
+	switch character {
+	case "english-teacher":
+		configYaml = englishTeacherConfig
+	}
+
+	err := yaml.Unmarshal(configYaml, &config)
 	if err != nil {
 		return nil, err
 	}

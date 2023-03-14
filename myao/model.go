@@ -45,13 +45,13 @@ type Myao struct {
 	systemText string
 }
 
-func New(users map[string]string) (*Myao, error) {
+func New(character string, users map[string]string) (*Myao, error) {
 	openAI := api.New(&config.Configuration{
 		ApiKey:       utils.ToPtr(openAIAccessToken),
 		Organization: utils.ToPtr(openAIOrganizationID),
 	})
 
-	config, err := configs.Load("default")
+	config, err := configs.Load(character)
 	if err != nil {
 		klog.Errorf("Failed to load config: %v", err)
 		return nil, err
