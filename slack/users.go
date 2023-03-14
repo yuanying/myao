@@ -41,7 +41,7 @@ func NewUsers(client *slack.Client) (*Users, error) {
 func (u *Users) Text(myao *myao.Myao, event *slackevents.MessageEvent) string {
 	text := event.Text
 	if user, exist := u.users[event.User]; exist {
-		text = fmt.Sprintf("%v 「%v」", user, text)
+		text = fmt.Sprintf(myao.Config.TextFormat, user, text)
 	}
 	for i, v := range u.users {
 		text = strings.Replace(text, fmt.Sprintf("<@%v>", i), v, -1)

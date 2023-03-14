@@ -13,6 +13,11 @@ var (
 	englishTeacherConfig []byte
 )
 
+type Message struct {
+	Role    string `yaml:"role"`
+	Content string `yaml:"content"`
+}
+
 type Config struct {
 	Name        string  `yaml:"name"`
 	SystemText  string  `yaml:"systemText"`
@@ -20,6 +25,9 @@ type Config struct {
 	ErrorText   string  `yaml:"errorText"`
 	SummaryText string  `yaml:"summaryText"`
 	Temperature float32 `yaml:"temperature"`
+	TextFormat  string  `yaml:"textFormat"`
+
+	InitConversations []Message `yaml:"initConversations"`
 }
 
 func Load(character string) (*Config, error) {

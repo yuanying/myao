@@ -32,7 +32,7 @@ type Memory struct {
 
 type Myao struct {
 	Name   string
-	config *configs.Config
+	Config *configs.Config
 	openAI api.OpenAIAPIIface
 
 	// mu protects memories from concurrent access.
@@ -63,12 +63,17 @@ func New(character string, users map[string]string) (*Myao, error) {
 	}
 	systemText := fmt.Sprintf(config.SystemText, sb.String())
 
-	return &Myao{
+	m := &Myao{
 		Name:       config.Name,
 		openAI:     openAI,
-		config:     config,
+		Config:     config,
 		systemText: systemText,
-	}, nil
+	}
+	for _, msg := range config.InitConversations {
+		m.remember(false, msg.Role, msg.Content)
+	}
+
+	return m, nil
 }
 
 func (m *Myao) SetUserID(id string) {
@@ -112,7 +117,7 @@ func (m *Myao) Summarize() {
 		copy(memories, m.memories)
 		klog.Infof("Needs summary")
 		go func() {
-			m.reply(true, "system", m.config.SummaryText)
+			m.reply(true, "system", m.Config.SummaryText)
 		}()
 	}
 }
@@ -134,7 +139,7 @@ func (m *Myao) Memories() []Memory {
 	defer m.mu.RUnlock()
 	systemText := m.systemText
 	if len(m.memories) < 15 {
-		systemText = systemText + m.config.InitText
+		systemText = systemText + m.Config.InitText
 	}
 	system := Memory{Message: api.Message{Role: "system", Content: systemText}}
 	return append([]Memory{system}, m.memories...)
@@ -155,7 +160,7 @@ func (m *Myao) Reply(content string) (string, error) {
 
 func (m *Myao) reply(summary bool, role, content string) (string, error) {
 	klog.Infof("Requesting chat completions...: %v", content)
-	temperature := m.config.Temperature
+	temperature := m.Config.Temperature
 	if summary {
 		temperature = 0
 	}
@@ -182,7 +187,7 @@ func (m *Myao) reply(summary bool, role, content string) (string, error) {
 				m.forget(8)
 			}
 		}
-		return m.config.ErrorText, err
+		return m.Config.ErrorText, err
 	}
 
 	reply := output.Choices[0].Message
