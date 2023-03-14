@@ -17,6 +17,7 @@ import (
 	"github.com/yuanying/myao/myao"
 	"github.com/yuanying/myao/slack/handler"
 	"github.com/yuanying/myao/slack/handler/event"
+	"github.com/yuanying/myao/slack/handler/socket"
 	"github.com/yuanying/myao/slack/users"
 )
 
@@ -97,6 +98,19 @@ func main() {
 	}
 
 	switch handlerType {
+	case "socket":
+		s, err := socket.New(&handler.Opts{
+			Myao:                myao,
+			Slack:               slackCli,
+			SlackUsers:          slackUsers,
+			MaxDelayReplyPeriod: maxDelayReplyPeriod,
+		})
+		if err != nil {
+			klog.Error("Failed to load socket client: %v", err)
+			os.Exit(1)
+		}
+		s.Run(ctx)
+
 	default:
 		runEventHandler(ctx, slackCli, slackUsers, myao)
 	}
