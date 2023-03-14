@@ -33,18 +33,24 @@ const (
 )
 
 var (
-	handlerType string
-	character   string
+	// General options
+	handlerType         string
+	character           string
+	maxDelayReplyPeriod time.Duration
 
+	// Options for Event type handler
 	shutdownDelayPeriod time.Duration
 	shutdownGracePeriod time.Duration
-	maxDelayReplyPeriod time.Duration
 	bindAddress         string
 
-	slackBotToken      string
-	slackAppToken      string
+	// Options for Slack Client
+	slackBotToken string
+	// For socket mode Slack Client
+	slackAppToken string
+	// For event mode Slack Client
 	slackSigningSecret string
 
+	// Options for OpenAI Client
 	openAIAccessToken    string
 	openAIOrganizationID string
 )
@@ -55,8 +61,9 @@ func init() {
 	})
 	pflag.StringVar(&character, "character", "default", "The character of this Chatbot.")
 	pflag.StringVar(&handlerType, "handler", "event", "Type of event handler.")
-	pflag.StringVar(&bindAddress, "bind-address", ":8080", "Address on which to expose web interface.")
 	pflag.DurationVar(&maxDelayReplyPeriod, "max-delay-reply-period", 600*time.Second, "set the time (in seconds) that the myao will wait before replying")
+
+	pflag.StringVar(&bindAddress, "bind-address", ":8080", "Address on which to expose web interface.")
 	pflag.DurationVar(&shutdownDelayPeriod, "shutdown-wait-period", 1*time.Second, "set the time (in seconds) that the server will wait before initiating shutdown")
 	pflag.DurationVar(&shutdownGracePeriod, "shutdown-grace-period", 5*time.Second, "set the time (in seconds) that the server will wait shutdown")
 	pflag.Parse()
