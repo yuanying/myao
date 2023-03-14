@@ -1,57 +1,38 @@
 package event
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
-	"strings"
-	"sync"
-	"time"
 
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	"k8s.io/klog/v2"
 
-	"github.com/yuanying/myao/myao"
-	"github.com/yuanying/myao/slack/users"
+	"github.com/yuanying/myao/slack/handler"
 )
 
 type Opts struct {
-	Myao                *myao.Myao
-	Slack               *slack.Client
-	SlackUsers          *users.Users
-	SlackSigningSecret  string
-	MaxDelayReplyPeriod time.Duration
+	*handler.Opts
+	SlackSigningSecret string
 }
 
 type Handler struct {
-	myao                *myao.Myao
-	myaoID              string
-	slack               *slack.Client
-	slackSigningSecret  string
-	users               *users.Users
-	maxDeplyReplyPeriod time.Duration
+	slackSigningSecret string
 
-	// mu protects cancel from concurrent access.
-	mu     sync.Mutex
-	cancel context.CancelFunc
+	innerHandler *handler.Handler
 }
 
 func New(opts *Opts) (*Handler, error) {
-	bot, err := opts.Slack.AuthTest()
+	innerHandler, err := handler.New(opts.Opts)
 	if err != nil {
 		return nil, err
 	}
+
 	return &Handler{
-		users:               opts.SlackUsers,
-		myao:                opts.Myao,
-		myaoID:              bot.UserID,
-		slack:               opts.Slack,
-		maxDeplyReplyPeriod: opts.MaxDelayReplyPeriod,
-		slackSigningSecret:  opts.SlackSigningSecret,
+		slackSigningSecret: opts.SlackSigningSecret,
+		innerHandler:       innerHandler,
 	}, nil
 }
 
@@ -87,67 +68,8 @@ func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case slackevents.CallbackEvent:
-		innerEvent := event.InnerEvent
-		switch event := innerEvent.Data.(type) {
-		case *slackevents.AppMentionEvent:
-			klog.Infof("AppMentionEvent: user -> %v,  text -> %v", event.User, event.Text)
-		case *slackevents.MessageEvent:
-			klog.Infof("MessageEvent: bot-> %v, user-> %v, text -> %v", event.BotID, event.User, event.Text)
-			h.Reply(event)
-		}
-	}
-}
-
-func (h *Handler) Reply(event *slackevents.MessageEvent) {
-	if event.BotID != "" {
-		return
-	}
-	if event.Text == "" {
-		return
-	}
-
-	h.mu.Lock()
-	if h.cancel != nil {
-		h.cancel()
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	h.cancel = cancel
-	h.mu.Unlock()
-
-	go h.reply(ctx, event.Channel, h.users.Text(h.myaoID, h.myao, event))
-}
-
-func (h *Handler) reply(ctx context.Context, channel, text string) {
-	sec := 5
-
-	if !strings.Contains(text, h.myao.Name) && !strings.Contains(text, fmt.Sprintf("@%v", h.myaoID)) {
-		seed := time.Now().UnixNano()
-		rand.Seed(seed)
-		sec = rand.Intn(int(h.maxDeplyReplyPeriod.Seconds()))
-		klog.Infof("Waiting reply %v seconds", sec)
-	}
-
-	select {
-	case <-ctx.Done():
-		h.myao.Remember("user", text)
-		klog.Infof("Skip message: %v", text)
-	case <-time.After(time.Duration(sec) * time.Second):
-		reply, err := h.myao.Reply(text)
-		if err != nil {
-			klog.Errorf("Myao reply error: %v", err)
-			if _, _, err := h.slack.PostMessage(channel, slack.MsgOptionText(reply, false)); err != nil {
-				klog.Errorf("Slack post message error: %v", err)
-				return
-			}
-			return
-		}
-		klog.Infof("OpenAPI reply: %v", reply)
-		if _, _, err := h.slack.PostMessage(channel, slack.MsgOptionText(reply, false)); err != nil {
-			klog.Errorf("Slack post message error: %v", err)
-			return
-		}
-		h.myao.Summarize()
+		klog.Infof("CallbackEVent: %v", event)
+		h.innerHandler.Handle(event.InnerEvent.Data)
 	}
 }
 

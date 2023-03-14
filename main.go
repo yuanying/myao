@@ -15,6 +15,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/yuanying/myao/myao"
+	"github.com/yuanying/myao/slack/handler"
 	"github.com/yuanying/myao/slack/handler/event"
 	"github.com/yuanying/myao/slack/users"
 )
@@ -31,8 +32,8 @@ const (
 )
 
 var (
-	handler   string
-	character string
+	handlerType string
+	character   string
 
 	shutdownDelayPeriod time.Duration
 	shutdownGracePeriod time.Duration
@@ -52,7 +53,7 @@ func init() {
 		pflag.CommandLine.AddGoFlag(f)
 	})
 	pflag.StringVar(&character, "character", "default", "The character of this Chatbot.")
-	pflag.StringVar(&handler, "handler", "event", "Type of event handler.")
+	pflag.StringVar(&handlerType, "handler", "event", "Type of event handler.")
 	pflag.StringVar(&bindAddress, "bind-address", ":8080", "Address on which to expose web interface.")
 	pflag.DurationVar(&maxDelayReplyPeriod, "max-delay-reply-period", 600*time.Second, "set the time (in seconds) that the myao will wait before replying")
 	pflag.DurationVar(&shutdownDelayPeriod, "shutdown-wait-period", 1*time.Second, "set the time (in seconds) that the server will wait before initiating shutdown")
@@ -95,7 +96,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	switch handler {
+	switch handlerType {
 	default:
 		runEventHandler(ctx, slackCli, slackUsers, myao)
 	}
@@ -105,11 +106,13 @@ func runEventHandler(ctx context.Context, slackCli *slack.Client, slackUsers *us
 	mux := http.NewServeMux()
 
 	slackOpts := &event.Opts{
-		Myao:                myao,
-		Slack:               slackCli,
-		SlackUsers:          slackUsers,
-		SlackSigningSecret:  slackSigningSecret,
-		MaxDelayReplyPeriod: maxDelayReplyPeriod,
+		Opts: &handler.Opts{
+			Myao:                myao,
+			Slack:               slackCli,
+			SlackUsers:          slackUsers,
+			MaxDelayReplyPeriod: maxDelayReplyPeriod,
+		},
+		SlackSigningSecret: slackSigningSecret,
 	}
 	slackHandler, err := event.New(slackOpts)
 	if err != nil {
