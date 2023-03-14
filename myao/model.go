@@ -3,7 +3,6 @@ package myao
 import (
 	_ "embed"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 
@@ -15,14 +14,11 @@ import (
 	"github.com/yuanying/myao/utils"
 )
 
-var (
-	openAIAccessToken    string
-	openAIOrganizationID string
-)
-
-func init() {
-	openAIAccessToken = os.Getenv("OPENAI_ACCESS_TOKEN")
-	openAIOrganizationID = os.Getenv("OPENAI_ORG_ID")
+type Opts struct {
+	OpenAIAccessToken    string
+	OpenAIOrganizationID string
+	CharacterType        string
+	UsersMap             map[string]string
 }
 
 type Memory struct {
@@ -39,26 +35,23 @@ type Myao struct {
 	mu       sync.RWMutex
 	memories []Memory
 
-	muu    sync.RWMutex
-	userID string
-
 	systemText string
 }
 
-func New(character string, users map[string]string) (*Myao, error) {
+func New(opts *Opts) (*Myao, error) {
 	openAI := api.New(&config.Configuration{
-		ApiKey:       utils.ToPtr(openAIAccessToken),
-		Organization: utils.ToPtr(openAIOrganizationID),
+		ApiKey:       utils.ToPtr(opts.OpenAIAccessToken),
+		Organization: utils.ToPtr(opts.OpenAIOrganizationID),
 	})
 
-	config, err := configs.Load(character)
+	config, err := configs.Load(opts.CharacterType)
 	if err != nil {
 		klog.Errorf("Failed to load config: %v", err)
 		return nil, err
 	}
 
 	var sb strings.Builder
-	for _, v := range users {
+	for _, v := range opts.UsersMap {
 		sb.WriteString(fmt.Sprintf("- %v\n", v))
 	}
 	systemText := fmt.Sprintf(config.SystemText, sb.String())
@@ -74,21 +67,6 @@ func New(character string, users map[string]string) (*Myao, error) {
 	}
 
 	return m, nil
-}
-
-func (m *Myao) SetUserID(id string) {
-	m.muu.Lock()
-	defer m.muu.Unlock()
-
-	klog.Infof("UserID is set: %v", id)
-	m.userID = id
-}
-
-func (m *Myao) UserID() string {
-	m.muu.RLock()
-	defer m.muu.RUnlock()
-
-	return m.userID
 }
 
 func (m *Myao) Remember(role, content string) {

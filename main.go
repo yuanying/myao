@@ -10,10 +10,13 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/slack-go/slack"
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
 
-	"github.com/yuanying/myao/slack"
+	"github.com/yuanying/myao/myao"
+	"github.com/yuanying/myao/slack/handler/event"
+	"github.com/yuanying/myao/slack/users"
 )
 
 const (
@@ -28,23 +31,40 @@ const (
 )
 
 var (
+	handler   string
+	character string
+
 	shutdownDelayPeriod time.Duration
 	shutdownGracePeriod time.Duration
 	maxDelayReplyPeriod time.Duration
 	bindAddress         string
-	character           string
+
+	slackBotToken      string
+	slackAppToken      string
+	slackSigningSecret string
+
+	openAIAccessToken    string
+	openAIOrganizationID string
 )
 
 func init() {
 	flag.CommandLine.VisitAll(func(f *flag.Flag) {
 		pflag.CommandLine.AddGoFlag(f)
 	})
-	pflag.StringVar(&bindAddress, "bind-address", ":8080", "Address on which to expose web interface.")
 	pflag.StringVar(&character, "character", "default", "The character of this Chatbot.")
+	pflag.StringVar(&handler, "handler", "event", "Type of event handler.")
+	pflag.StringVar(&bindAddress, "bind-address", ":8080", "Address on which to expose web interface.")
 	pflag.DurationVar(&maxDelayReplyPeriod, "max-delay-reply-period", 600*time.Second, "set the time (in seconds) that the myao will wait before replying")
 	pflag.DurationVar(&shutdownDelayPeriod, "shutdown-wait-period", 1*time.Second, "set the time (in seconds) that the server will wait before initiating shutdown")
 	pflag.DurationVar(&shutdownGracePeriod, "shutdown-grace-period", 5*time.Second, "set the time (in seconds) that the server will wait shutdown")
 	pflag.Parse()
+
+	slackBotToken = os.Getenv("SLACK_BOT_TOKEN")
+	slackAppToken = os.Getenv("SLACK_APP_TOKEN")
+	slackSigningSecret = os.Getenv("SLACK_SIGNING_SECRET")
+
+	openAIAccessToken = os.Getenv("OPENAI_ACCESS_TOKEN")
+	openAIOrganizationID = os.Getenv("OPENAI_ORG_ID")
 }
 
 func main() {
@@ -52,9 +72,46 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
+	slackOpts := []slack.Option{}
+	if slackAppToken != "" {
+		slackOpts = append(slackOpts, slack.OptionAppLevelToken(slackAppToken))
+	}
+	slackCli := slack.New(slackBotToken, slackOpts...)
+	slackUsers, err := users.New(slackCli)
+	if err != nil {
+		klog.Errorf("Failed to create slack users obj: %v", err)
+		os.Exit(1)
+	}
+
+	myaoOpts := &myao.Opts{
+		OpenAIAccessToken:    openAIAccessToken,
+		OpenAIOrganizationID: openAIOrganizationID,
+		UsersMap:             slackUsers.Users,
+		CharacterType:        character,
+	}
+	myao, err := myao.New(myaoOpts)
+	if err != nil {
+		klog.Errorf("Failed to create myao obj: %v", err)
+		os.Exit(1)
+	}
+
+	switch handler {
+	default:
+		runEventHandler(ctx, slackCli, slackUsers, myao)
+	}
+}
+
+func runEventHandler(ctx context.Context, slackCli *slack.Client, slackUsers *users.Users, myao *myao.Myao) {
 	mux := http.NewServeMux()
 
-	slackHandler, err := slack.New(character, maxDelayReplyPeriod)
+	slackOpts := &event.Opts{
+		Myao:                myao,
+		Slack:               slackCli,
+		SlackUsers:          slackUsers,
+		SlackSigningSecret:  slackSigningSecret,
+		MaxDelayReplyPeriod: maxDelayReplyPeriod,
+	}
+	slackHandler, err := event.New(slackOpts)
 	if err != nil {
 		klog.Errorf("slackHandler initialization fails: %v", err)
 		return
@@ -80,7 +137,7 @@ func main() {
 	klog.Info("signal received...")
 	time.Sleep(shutdownDelayPeriod)
 
-	ctx, cancel = context.WithTimeout(context.Background(), shutdownGracePeriod)
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownGracePeriod)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {

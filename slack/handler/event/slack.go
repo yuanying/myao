@@ -1,4 +1,4 @@
-package slack
+package event
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -17,22 +16,23 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/yuanying/myao/myao"
+	"github.com/yuanying/myao/slack/users"
 )
 
-var (
-	slackBotToken      string
-	slackSigningSecret string
-)
-
-func init() {
-	slackBotToken = os.Getenv("SLACK_BOT_TOKEN")
-	slackSigningSecret = os.Getenv("SLACK_SIGNING_SECRET")
+type Opts struct {
+	Myao                *myao.Myao
+	Slack               *slack.Client
+	SlackUsers          *users.Users
+	SlackSigningSecret  string
+	MaxDelayReplyPeriod time.Duration
 }
 
 type Handler struct {
 	myao                *myao.Myao
+	myaoID              string
 	slack               *slack.Client
-	users               *Users
+	slackSigningSecret  string
+	users               *users.Users
 	maxDeplyReplyPeriod time.Duration
 
 	// mu protects cancel from concurrent access.
@@ -40,31 +40,23 @@ type Handler struct {
 	cancel context.CancelFunc
 }
 
-func New(character string, maxDeplyReplyPeriod time.Duration) (*Handler, error) {
-	slack := slack.New(slackBotToken)
-	bot, err := slack.AuthTest()
+func New(opts *Opts) (*Handler, error) {
+	bot, err := opts.Slack.AuthTest()
 	if err != nil {
 		return nil, err
 	}
-	users, err := NewUsers(slack)
-	if err != nil {
-		return nil, err
-	}
-	myao, err := myao.New(character, users.users)
-	if err != nil {
-		return nil, err
-	}
-	myao.SetUserID(bot.UserID)
 	return &Handler{
-		users:               users,
-		myao:                myao,
-		slack:               slack,
-		maxDeplyReplyPeriod: maxDeplyReplyPeriod,
+		users:               opts.SlackUsers,
+		myao:                opts.Myao,
+		myaoID:              bot.UserID,
+		slack:               opts.Slack,
+		maxDeplyReplyPeriod: opts.MaxDelayReplyPeriod,
+		slackSigningSecret:  opts.SlackSigningSecret,
 	}, nil
 }
 
 func (h *Handler) Handle(w http.ResponseWriter, r *http.Request) {
-	body, err := Verify(r.Header, r.Body)
+	body, err := h.Verify(r.Header, r.Body)
 	if err != nil {
 		klog.Errorf("Verify error: %v", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -123,13 +115,13 @@ func (h *Handler) Reply(event *slackevents.MessageEvent) {
 	h.cancel = cancel
 	h.mu.Unlock()
 
-	go h.reply(ctx, event.Channel, h.users.Text(h.myao, event))
+	go h.reply(ctx, event.Channel, h.users.Text(h.myaoID, h.myao, event))
 }
 
 func (h *Handler) reply(ctx context.Context, channel, text string) {
 	sec := 5
 
-	if !strings.Contains(text, h.myao.Name) && !strings.Contains(text, fmt.Sprintf("@%v", h.myao.UserID())) {
+	if !strings.Contains(text, h.myao.Name) && !strings.Contains(text, fmt.Sprintf("@%v", h.myaoID)) {
 		seed := time.Now().UnixNano()
 		rand.Seed(seed)
 		sec = rand.Intn(int(h.maxDeplyReplyPeriod.Seconds()))
@@ -159,8 +151,8 @@ func (h *Handler) reply(ctx context.Context, channel, text string) {
 	}
 }
 
-func Verify(header http.Header, body io.ReadCloser) ([]byte, error) {
-	verifier, err := slack.NewSecretsVerifier(header, slackSigningSecret)
+func (h *Handler) Verify(header http.Header, body io.ReadCloser) ([]byte, error) {
+	verifier, err := slack.NewSecretsVerifier(header, h.slackSigningSecret)
 	if err != nil {
 		return nil, fmt.Errorf("slack secret verifier error: %w", err)
 	}

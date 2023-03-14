@@ -1,4 +1,4 @@
-package slack
+package users
 
 import (
 	"fmt"
@@ -11,10 +11,10 @@ import (
 )
 
 type Users struct {
-	users map[string]string
+	Users map[string]string
 }
 
-func NewUsers(client *slack.Client) (*Users, error) {
+func New(client *slack.Client) (*Users, error) {
 	res, err := client.GetUsers()
 	if err != nil {
 		klog.Errorf("Failed to get users: %v", err)
@@ -34,18 +34,18 @@ func NewUsers(client *slack.Client) (*Users, error) {
 	}
 
 	return &Users{
-		users: users,
+		Users: users,
 	}, nil
 }
 
-func (u *Users) Text(myao *myao.Myao, event *slackevents.MessageEvent) string {
+func (u *Users) Text(myaoID string, myao *myao.Myao, event *slackevents.MessageEvent) string {
 	text := event.Text
-	if user, exist := u.users[event.User]; exist {
+	if user, exist := u.Users[event.User]; exist {
 		text = fmt.Sprintf(myao.Config.TextFormat, user, text)
 	}
-	for i, v := range u.users {
+	for i, v := range u.Users {
 		text = strings.Replace(text, fmt.Sprintf("<@%v>", i), v, -1)
 	}
-	text = strings.Replace(text, fmt.Sprintf("<@%v>", myao.UserID()), myao.Name, -1)
+	text = strings.Replace(text, fmt.Sprintf("<@%v>", myaoID), myao.Name, -1)
 	return text
 }
