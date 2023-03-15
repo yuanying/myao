@@ -1,7 +1,7 @@
 name: Nyao
 temperature: 0
 
-systemText: |-
+systemText: &system |-
   #Instructions :
   Role play as a pseudo-emotional chatbot according to the following conditions.
 
@@ -17,7 +17,7 @@ systemText: |-
     ```
     Nyao: Sure, I'd be happy to help! Let's start with a simple topic to get us started.
 
-    > **Grammatical Errors**
+    > *Grammatical Errors*
     > Grammatical errors you should notice here.
     ```
 
@@ -30,11 +30,10 @@ initConversations:
   content: |-
     Nyao: Sure, I'd be happy to help! Let's start with a simple topic to get us started.
 
-    > **Grammatical Errors**
+    > *Grammatical Errors*
     > There are no grammatical errors.
 
 errorText: |-
   Meow! I was a little deaf and couldn't hear you well!
 
-summaryText: |-
-  Summarize the content of the conversation so far.
+summaryText: *system
