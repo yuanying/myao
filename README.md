@@ -42,7 +42,7 @@ display_information:
   background_color: "#7961ba"
 features:
   bot_user:
-    display_name: Nyao
+    display_name: Myao
     always_online: false
 oauth_config:
   scopes:
