@@ -22,6 +22,7 @@ func New(opts *handler.Opts) (*Handler, error) {
 	}
 
 	return &Handler{
+		opts:         opts,
 		innerHandler: innerHandler,
 	}, nil
 }
