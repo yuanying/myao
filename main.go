@@ -104,6 +104,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	mux := http.NewServeMux()
+
 	switch handlerType {
 	case "socket":
 		s, err := socket.New(&handler.Opts{
@@ -116,31 +118,29 @@ func main() {
 			klog.Error("Failed to load socket client: %v", err)
 			os.Exit(1)
 		}
-		s.Run(ctx)
+		go s.Run(ctx)
 
 	default:
-		runEventHandler(ctx, slackCli, slackUsers, myao)
+		slackOpts := &event.Opts{
+			Opts: &handler.Opts{
+				Myao:                myao,
+				Slack:               slackCli,
+				SlackUsers:          slackUsers,
+				MaxDelayReplyPeriod: maxDelayReplyPeriod,
+			},
+			SlackSigningSecret: slackSigningSecret,
+		}
+		slackHandler, err := event.New(slackOpts)
+		if err != nil {
+			klog.Errorf("slackHandler initialization fails: %v", err)
+			return
+		}
+		mux.HandleFunc("/slack/events", slackHandler.Handle)
 	}
-}
 
-func runEventHandler(ctx context.Context, slackCli *slack.Client, slackUsers *users.Users, myao *myao.Myao) {
-	mux := http.NewServeMux()
-
-	slackOpts := &event.Opts{
-		Opts: &handler.Opts{
-			Myao:                myao,
-			Slack:               slackCli,
-			SlackUsers:          slackUsers,
-			MaxDelayReplyPeriod: maxDelayReplyPeriod,
-		},
-		SlackSigningSecret: slackSigningSecret,
-	}
-	slackHandler, err := event.New(slackOpts)
-	if err != nil {
-		klog.Errorf("slackHandler initialization fails: %v", err)
-		return
-	}
-	mux.HandleFunc("/slack/events", slackHandler.Handle)
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "ok")
+	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, (fmt.Sprintf(rootHTMLDoc, "v0.0.1")))
 	})
@@ -161,8 +161,8 @@ func runEventHandler(ctx context.Context, slackCli *slack.Client, slackUsers *us
 	klog.Info("signal received...")
 	time.Sleep(shutdownDelayPeriod)
 
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownGracePeriod)
-	defer cancel()
+	ctx, cancelShutdown := context.WithTimeout(context.Background(), shutdownGracePeriod)
+	defer cancelShutdown()
 
 	if err := server.Shutdown(ctx); err != nil {
 		klog.Fatal(err.Error())

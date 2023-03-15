@@ -67,6 +67,7 @@ func (h *Handler) Reply(event *slackevents.MessageEvent) {
 	if event.Text == "" {
 		return
 	}
+	// event.ThreadTimeStamp
 
 	h.mu.Lock()
 	if h.cancel != nil {
@@ -77,10 +78,10 @@ func (h *Handler) Reply(event *slackevents.MessageEvent) {
 	h.cancel = cancel
 	h.mu.Unlock()
 
-	go h.reply(ctx, event.Channel, h.users.Text(h.myaoID, h.myao, event))
+	go h.reply(ctx, event.Channel, event.ThreadTimeStamp, h.users.Text(h.myaoID, h.myao, event))
 }
 
-func (h *Handler) reply(ctx context.Context, channel, text string) {
+func (h *Handler) reply(ctx context.Context, channel, thread, text string) {
 	sec := 5
 
 	if !strings.Contains(text, h.myao.Name) && !strings.Contains(text, fmt.Sprintf("@%v", h.myaoID)) {
@@ -96,16 +97,21 @@ func (h *Handler) reply(ctx context.Context, channel, text string) {
 		klog.Infof("Skip message: %v", text)
 	case <-time.After(time.Duration(sec) * time.Second):
 		reply, err := h.myao.Reply(text)
+		msgOpts := []slack.MsgOption{slack.MsgOptionText(reply, false)}
+		if thread != "" {
+			msgOpts = append(msgOpts, slack.MsgOptionTS(thread))
+		}
+
 		if err != nil {
 			klog.Errorf("Myao reply error: %v", err)
-			if _, _, err := h.slack.PostMessage(channel, slack.MsgOptionText(reply, false)); err != nil {
+			if _, _, err := h.slack.PostMessage(channel, msgOpts...); err != nil {
 				klog.Errorf("Slack post message error: %v", err)
 				return
 			}
 			return
 		}
 		klog.Infof("OpenAPI reply: %v", reply)
-		if _, _, err := h.slack.PostMessage(channel, slack.MsgOptionText(reply, false)); err != nil {
+		if _, _, err := h.slack.PostMessage(channel, msgOpts...); err != nil {
 			klog.Errorf("Slack post message error: %v", err)
 			return
 		}
