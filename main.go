@@ -60,7 +60,7 @@ func init() {
 		pflag.CommandLine.AddGoFlag(f)
 	})
 	pflag.StringVar(&character, "character", "default", "The character of this Chatbot.")
-	pflag.StringVar(&handlerType, "handler", "event", "Type of event handler.")
+	pflag.StringVar(&handlerType, "handler", "socket", "Type of event handler.")
 	pflag.DurationVar(&maxDelayReplyPeriod, "max-delay-reply-period", 600*time.Second, "set the time (in seconds) that the myao will wait before replying")
 
 	pflag.StringVar(&bindAddress, "bind-address", ":8080", "Address on which to expose web interface.")
@@ -107,20 +107,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	switch handlerType {
-	case "socket":
-		s, err := socket.New(&handler.Opts{
-			Myao:                myao,
-			Slack:               slackCli,
-			SlackUsers:          slackUsers,
-			MaxDelayReplyPeriod: maxDelayReplyPeriod,
-		})
-		if err != nil {
-			klog.Error("Failed to load socket client: %v", err)
-			os.Exit(1)
-		}
-		go s.Run(ctx)
-
-	default:
+	case "event":
 		slackOpts := &event.Opts{
 			Opts: &handler.Opts{
 				Myao:                myao,
@@ -136,6 +123,18 @@ func main() {
 			return
 		}
 		mux.HandleFunc("/slack/events", slackHandler.Handle)
+	default:
+		s, err := socket.New(&handler.Opts{
+			Myao:                myao,
+			Slack:               slackCli,
+			SlackUsers:          slackUsers,
+			MaxDelayReplyPeriod: maxDelayReplyPeriod,
+		})
+		if err != nil {
+			klog.Error("Failed to load socket client: %v", err)
+			os.Exit(1)
+		}
+		go s.Run(ctx)
 	}
 
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
