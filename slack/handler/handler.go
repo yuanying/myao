@@ -12,19 +12,19 @@ import (
 	"github.com/slack-go/slack/slackevents"
 	"k8s.io/klog/v2"
 
-	"github.com/yuanying/myao/myao"
+	"github.com/yuanying/myao/model"
 	"github.com/yuanying/myao/slack/users"
 )
 
 type Opts struct {
-	Myao                *myao.Myao
+	Myao                model.Model
 	Slack               *slack.Client
 	SlackUsers          *users.Users
 	MaxDelayReplyPeriod time.Duration
 }
 
 type Handler struct {
-	myao                *myao.Myao
+	myao                model.Model
 	myaoID              string
 	slack               *slack.Client
 	users               *users.Users
@@ -84,7 +84,7 @@ func (h *Handler) Reply(event *slackevents.MessageEvent) {
 func (h *Handler) reply(ctx context.Context, channel, thread, text string) {
 	sec := 5
 
-	if !strings.Contains(text, h.myao.Name) && !strings.Contains(text, fmt.Sprintf("@%v", h.myaoID)) {
+	if !strings.Contains(text, h.myao.Name()) && !strings.Contains(text, fmt.Sprintf("@%v", h.myaoID)) {
 		seed := time.Now().UnixNano()
 		rand.Seed(seed)
 		sec = rand.Intn(int(h.maxDeplyReplyPeriod.Seconds()))

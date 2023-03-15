@@ -14,7 +14,8 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
 
-	"github.com/yuanying/myao/myao"
+	"github.com/yuanying/myao/model"
+	"github.com/yuanying/myao/model/myao"
 	"github.com/yuanying/myao/slack/handler"
 	"github.com/yuanying/myao/slack/handler/event"
 	"github.com/yuanying/myao/slack/handler/socket"
@@ -92,7 +93,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	myaoOpts := &myao.Opts{
+	myaoOpts := &model.Opts{
 		OpenAIAccessToken:    openAIAccessToken,
 		OpenAIOrganizationID: openAIOrganizationID,
 		UsersMap:             slackUsers.Users,

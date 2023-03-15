@@ -10,16 +10,12 @@ import (
 	"github.com/ieee0824/gopenai-api/config"
 	"k8s.io/klog/v2"
 
-	"github.com/yuanying/myao/myao/configs"
+	"github.com/yuanying/myao/model"
+	"github.com/yuanying/myao/model/myao/configs"
 	"github.com/yuanying/myao/utils"
 )
 
-type Opts struct {
-	OpenAIAccessToken    string
-	OpenAIOrganizationID string
-	CharacterType        string
-	UsersMap             map[string]string
-}
+var _ model.Model = (*Myao)(nil)
 
 type Memory struct {
 	api.Message
@@ -27,7 +23,7 @@ type Memory struct {
 }
 
 type Myao struct {
-	Name   string
+	name   string
 	Config *configs.Config
 	openAI api.OpenAIAPIIface
 
@@ -38,7 +34,7 @@ type Myao struct {
 	systemText string
 }
 
-func New(opts *Opts) (*Myao, error) {
+func New(opts *model.Opts) (*Myao, error) {
 	openAI := api.New(&config.Configuration{
 		ApiKey:       utils.ToPtr(opts.OpenAIAccessToken),
 		Organization: utils.ToPtr(opts.OpenAIOrganizationID),
@@ -57,7 +53,7 @@ func New(opts *Opts) (*Myao, error) {
 	systemText := fmt.Sprintf(config.SystemText, sb.String())
 
 	m := &Myao{
-		Name:       config.Name,
+		name:       config.Name,
 		openAI:     openAI,
 		Config:     config,
 		systemText: systemText,
@@ -67,6 +63,14 @@ func New(opts *Opts) (*Myao, error) {
 	}
 
 	return m, nil
+}
+
+func (m *Myao) Name() string {
+	return m.name
+}
+
+func (m *Myao) FormatText(user, content string) string {
+	return fmt.Sprintf(m.Config.TextFormat, user, content)
 }
 
 func (m *Myao) Remember(role, content string) {
