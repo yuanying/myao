@@ -44,6 +44,8 @@ func (h *Handler) Run(ctx context.Context) {
 				default:
 					klog.Warningf("Unsupported event: %v", event.Type)
 				}
+			case socketmode.EventTypeHello:
+				klog.Infof("EventTypeHello")
 			default:
 				klog.Warningf("Unsupported socket event: %v", socketEvent.Type)
 			}

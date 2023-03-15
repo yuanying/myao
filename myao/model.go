@@ -142,10 +142,14 @@ func (m *Myao) reply(summary bool, role, content string) (string, error) {
 	if summary {
 		temperature = 0
 	}
+	messages := toMessages(m.Memories())
+	if content != "" {
+		messages = append(messages, api.Message{Role: role, Content: content})
+	}
 
 	output, err := m.openAI.ChatCompletionsV1(&api.ChatCompletionsV1Input{
 		Model:       utils.ToPtr("gpt-3.5-turbo"),
-		Messages:    append(toMessages(m.Memories()), api.Message{Role: role, Content: content}),
+		Messages:    messages,
 		Temperature: utils.ToPtr(temperature),
 	})
 	if output.Usage != nil {
@@ -169,7 +173,7 @@ func (m *Myao) reply(summary bool, role, content string) (string, error) {
 	}
 
 	reply := output.Choices[0].Message
-	if summary != true {
+	if summary != true && content != "" {
 		m.remember(summary, role, content)
 	}
 	m.remember(summary, reply.Role, reply.Content)
