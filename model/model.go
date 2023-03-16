@@ -4,8 +4,10 @@ import (
 	"sync"
 
 	"github.com/ieee0824/gopenai-api/api"
-	"github.com/yuanying/myao/utils"
 	"k8s.io/klog/v2"
+
+	"github.com/yuanying/myao/model/configs"
+	"github.com/yuanying/myao/utils"
 )
 
 type Opts struct {
@@ -29,12 +31,8 @@ type memory struct {
 }
 
 type Shared struct {
-	Name        string
-	SystemText  string
-	SummaryText string
-	Temperature float32
-	ErrorText   string
-	OpenAI      api.OpenAIAPIIface
+	*configs.Config
+	OpenAI api.OpenAIAPIIface
 
 	// mu protects memories from concurrent access.
 	mu       sync.RWMutex

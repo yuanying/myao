@@ -10,7 +10,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/yuanying/myao/model"
-	"github.com/yuanying/myao/model/myao/configs"
+	"github.com/yuanying/myao/model/configs"
 	"github.com/yuanying/myao/utils"
 )
 
@@ -38,15 +38,12 @@ func New(opts *model.Opts) (*Myao, error) {
 		sb.WriteString(fmt.Sprintf("- %v\n", v))
 	}
 	systemText := fmt.Sprintf(config.SystemText, sb.String())
+	config.SystemText = systemText
 
 	m := &Myao{
 		model: &model.Shared{
-			Name:        config.Name,
-			OpenAI:      openAI,
-			SummaryText: config.SummaryText,
-			Temperature: config.Temperature,
-			SystemText:  systemText,
-			ErrorText:   config.ErrorText,
+			Config: config,
+			OpenAI: openAI,
 		},
 		Config: config,
 	}
