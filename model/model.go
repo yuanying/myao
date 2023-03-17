@@ -147,3 +147,12 @@ func (s *Shared) Reply(summary bool, role, content string) (string, error) {
 
 	return reply.Content, nil
 }
+
+func (s *Shared) ChatCompletions(messages []api.Message) (*api.ChatCompletionsV1Output, error) {
+	temperature := s.Temperature
+	return s.OpenAI.ChatCompletionsV1(&api.ChatCompletionsV1Input{
+		Model:       utils.ToPtr("gpt-3.5-turbo"),
+		Messages:    messages,
+		Temperature: utils.ToPtr(temperature),
+	})
+}

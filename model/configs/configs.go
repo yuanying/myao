@@ -4,6 +4,7 @@ import (
 	_ "embed"
 
 	"gopkg.in/yaml.v3"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -11,6 +12,10 @@ var (
 	defaultConfig []byte
 	//go:embed english_teacher.yaml
 	englishTeacherConfig []byte
+	//go:embed nyao.yaml
+	nyaoConfig []byte
+	//go:embed english_teaching_system.yaml
+	englishTeachingSystemConfig []byte
 )
 
 type Message struct {
@@ -31,7 +36,6 @@ type Config struct {
 }
 
 func Load(character string) (*Config, error) {
-	config := Config{}
 	configYaml := defaultConfig
 
 	switch character {
@@ -39,10 +43,27 @@ func Load(character string) (*Config, error) {
 		configYaml = englishTeacherConfig
 	}
 
-	err := yaml.Unmarshal(configYaml, &config)
+	return load(configYaml)
+}
+
+func LoadNyao() (*Config, *Config, error) {
+	nyao, err := load(nyaoConfig)
 	if err != nil {
-		return nil, err
+		klog.Infof("Failed to load nyao")
+		return nil, nil, err
 	}
 
-	return &config, nil
+	system, err := load(englishTeachingSystemConfig)
+	if err != nil {
+		klog.Infof("Failed to load nyao system")
+		return nil, nil, err
+	}
+
+	return nyao, system, nil
+}
+
+func load(configYaml []byte) (config *Config, err error) {
+	config = &Config{}
+	err = yaml.Unmarshal(configYaml, config)
+	return
 }

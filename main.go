@@ -16,6 +16,7 @@ import (
 
 	"github.com/yuanying/myao/model"
 	"github.com/yuanying/myao/model/myao"
+	"github.com/yuanying/myao/model/nyao"
 	"github.com/yuanying/myao/slack/handler"
 	"github.com/yuanying/myao/slack/handler/event"
 	"github.com/yuanying/myao/slack/handler/socket"
@@ -78,6 +79,7 @@ func init() {
 }
 
 func main() {
+	var bot model.Model
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -99,7 +101,13 @@ func main() {
 		UsersMap:             slackUsers.Users,
 		CharacterType:        character,
 	}
-	myao, err := myao.New(myaoOpts)
+
+	switch character {
+	case "nyao":
+		bot, err = nyao.New(myaoOpts)
+	default:
+		bot, err = myao.New(myaoOpts)
+	}
 	if err != nil {
 		klog.Errorf("Failed to create myao obj: %v", err)
 		os.Exit(1)
@@ -111,7 +119,7 @@ func main() {
 	case "event":
 		slackOpts := &event.Opts{
 			Opts: &handler.Opts{
-				Myao:                myao,
+				Myao:                bot,
 				Slack:               slackCli,
 				SlackUsers:          slackUsers,
 				MaxDelayReplyPeriod: maxDelayReplyPeriod,
@@ -126,7 +134,7 @@ func main() {
 		mux.HandleFunc("/slack/events", slackHandler.Handle)
 	default:
 		s, err := socket.New(&handler.Opts{
-			Myao:                myao,
+			Myao:                bot,
 			Slack:               slackCli,
 			SlackUsers:          slackUsers,
 			MaxDelayReplyPeriod: maxDelayReplyPeriod,
