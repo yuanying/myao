@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ieee0824/gopenai-api/api"
-	"github.com/ieee0824/gopenai-api/config"
+	"github.com/sashabaranov/go-openai"
 	"k8s.io/klog/v2"
 
 	"github.com/yuanying/myao/model"
 	"github.com/yuanying/myao/model/configs"
-	"github.com/yuanying/myao/utils"
 )
 
 var _ model.Model = (*Nyao)(nil)
@@ -23,10 +21,11 @@ type Nyao struct {
 }
 
 func New(opts *model.Opts) (*Nyao, error) {
-	openAI := api.New(&config.Configuration{
-		ApiKey:       utils.ToPtr(opts.OpenAIAccessToken),
-		Organization: utils.ToPtr(opts.OpenAIOrganizationID),
-	})
+	openAIConfig := openai.DefaultConfig(opts.OpenAIAccessToken)
+	if opts.OpenAIOrganizationID != "" {
+		openAIConfig.OrgID = opts.OpenAIOrganizationID
+	}
+	openAI := openai.NewClientWithConfig(openAIConfig)
 
 	nyao, system, err := configs.LoadNyao()
 	if err != nil {
@@ -105,7 +104,7 @@ func (n *Nyao) nyaoReply(content string) <-chan result {
 func (n *Nyao) sysReply(content string) <-chan result {
 	res := make(chan result)
 
-	messages := []api.Message{
+	messages := []openai.ChatCompletionMessage{
 		{
 			Role:    "system",
 			Content: n.systemConfig.SystemText,
@@ -117,19 +116,19 @@ func (n *Nyao) sysReply(content string) <-chan result {
 	}
 
 	for _, m := range n.systemConfig.InitConversations {
-		messages = append(messages, api.Message{Role: m.Role, Content: m.Content})
+		messages = append(messages, openai.ChatCompletionMessage{Role: m.Role, Content: m.Content})
 	}
 	klog.Infof("System Call:")
 	for i, m := range messages {
 		klog.Infof("sys %v: %v, %v", i, m.Role, m.Content)
 	}
 
-	go func(messages []api.Message) {
+	go func(messages []openai.ChatCompletionMessage) {
 		defer close(res)
 
 		output, err := n.system.ChatCompletions(messages)
 		if err != nil {
-			klog.Warningf("System error message: %v", output.Error.Message)
+			klog.Warningf("System error message: %v", err)
 			res <- result{err: err, reply: n.systemConfig.ErrorText}
 			return
 		}

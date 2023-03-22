@@ -1,13 +1,14 @@
 package model
 
 import (
+	"context"
+	"errors"
 	"sync"
 
-	"github.com/ieee0824/gopenai-api/api"
+	"github.com/sashabaranov/go-openai"
 	"k8s.io/klog/v2"
 
 	"github.com/yuanying/myao/model/configs"
-	"github.com/yuanying/myao/utils"
 )
 
 type Opts struct {
@@ -26,13 +27,13 @@ type Model interface {
 }
 
 type memory struct {
-	api.Message
+	Message openai.ChatCompletionMessage
 	summary bool
 }
 
 type Shared struct {
 	*configs.Config
-	OpenAI api.OpenAIAPIIface
+	OpenAI *openai.Client
 
 	// mu protects memories from concurrent access.
 	mu       sync.RWMutex
@@ -45,7 +46,7 @@ func (s *Shared) Remember(summary bool, role, content string) {
 	klog.Infof("memories: %v", len(s.memories))
 	s.memories = append(s.memories, memory{
 		summary: summary,
-		Message: api.Message{
+		Message: openai.ChatCompletionMessage{
 			Role:    role,
 			Content: content,
 		},
@@ -62,11 +63,11 @@ func (s *Shared) Forget(num int) {
 	s.memories = s.memories[num:]
 }
 
-func (s *Shared) Messages() []api.Message {
+func (s *Shared) Messages() []openai.ChatCompletionMessage {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	rtn := make([]api.Message, len(s.memories)+1)
-	rtn[0] = api.Message{Role: "system", Content: s.SystemText}
+	rtn := make([]openai.ChatCompletionMessage, len(s.memories)+1)
+	rtn[0] = openai.ChatCompletionMessage{Role: "system", Content: s.SystemText}
 
 	for i := range s.memories {
 		rtn[i+1] = s.memories[i].Message
@@ -108,32 +109,39 @@ func (s *Shared) Reply(summary bool, role, content string) (string, error) {
 	}
 	messages := s.Messages()
 	if content != "" {
-		messages = append(messages, api.Message{Role: role, Content: content})
+		messages = append(messages, openai.ChatCompletionMessage{Role: role, Content: content})
 	}
 
-	output, err := s.OpenAI.ChatCompletionsV1(&api.ChatCompletionsV1Input{
-		Model:       utils.ToPtr("gpt-3.5-turbo"),
-		Messages:    messages,
-		Temperature: utils.ToPtr(temperature),
-	})
-	if output.Usage != nil {
-		klog.Infof("Usage: prompt %v tokens, completions %v tokens", output.Usage.PromptTokens, output.Usage.CompletionTokens)
-		if output.Usage.PromptTokens > 3584 {
-			s.Forget(5)
-		} else if output.Usage.PromptTokens > 3328 {
-			s.Forget(4)
-		} else if output.Usage.PromptTokens > 3072 {
-			s.Forget(3)
-		}
-	}
+	output, err := s.OpenAI.CreateChatCompletion(
+		context.TODO(),
+		openai.ChatCompletionRequest{
+			Model:       openai.GPT3Dot5Turbo,
+			Messages:    messages,
+			Temperature: temperature,
+		},
+	)
 	if err != nil {
-		if output.Error != nil {
-			klog.Errorf("OpenAI returns error: %v\n, message: %v", err, output.Error.Message)
-			if output.Error.Code == "context_length_exceeded" {
-				s.Forget(8)
+		klog.Errorf("OpenAI returns error: %v", err)
+		var openAIErr *openai.APIError
+		if errors.As(err, &openAIErr) {
+			klog.Infof("openAIErr Message: %v", err, openAIErr.Message)
+			if openAIErr.Code != nil {
+				klog.Infof("openAIErr Code: %v", openAIErr.Code)
+				if *openAIErr.Code == "context_length_exceeded" {
+					s.Forget(8)
+				}
 			}
 		}
 		return s.ErrorText, err
+	}
+
+	klog.Infof("Usage: prompt %v tokens, completions %v tokens", output.Usage.PromptTokens, output.Usage.CompletionTokens)
+	if output.Usage.PromptTokens > 3584 {
+		s.Forget(5)
+	} else if output.Usage.PromptTokens > 3328 {
+		s.Forget(4)
+	} else if output.Usage.PromptTokens > 3072 {
+		s.Forget(3)
 	}
 
 	reply := output.Choices[0].Message
@@ -148,11 +156,18 @@ func (s *Shared) Reply(summary bool, role, content string) (string, error) {
 	return reply.Content, nil
 }
 
-func (s *Shared) ChatCompletions(messages []api.Message) (*api.ChatCompletionsV1Output, error) {
+func (s *Shared) ChatCompletions(messages []openai.ChatCompletionMessage) (*openai.ChatCompletionResponse, error) {
 	temperature := s.Temperature
-	return s.OpenAI.ChatCompletionsV1(&api.ChatCompletionsV1Input{
-		Model:       utils.ToPtr("gpt-3.5-turbo"),
-		Messages:    messages,
-		Temperature: utils.ToPtr(temperature),
-	})
+	response, err := s.OpenAI.CreateChatCompletion(
+		context.TODO(),
+		openai.ChatCompletionRequest{
+			Model:       openai.GPT3Dot5Turbo,
+			Messages:    messages,
+			Temperature: temperature,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &response, nil
 }

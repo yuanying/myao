@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ieee0824/gopenai-api/api"
-	"github.com/ieee0824/gopenai-api/config"
+	"github.com/sashabaranov/go-openai"
 	"k8s.io/klog/v2"
 
 	"github.com/yuanying/myao/model"
 	"github.com/yuanying/myao/model/configs"
-	"github.com/yuanying/myao/utils"
 )
 
 var _ model.Model = (*Myao)(nil)
@@ -22,10 +20,11 @@ type Myao struct {
 }
 
 func New(opts *model.Opts) (*Myao, error) {
-	openAI := api.New(&config.Configuration{
-		ApiKey:       utils.ToPtr(opts.OpenAIAccessToken),
-		Organization: utils.ToPtr(opts.OpenAIOrganizationID),
-	})
+	openAIConfig := openai.DefaultConfig(opts.OpenAIAccessToken)
+	if opts.OpenAIOrganizationID != "" {
+		openAIConfig.OrgID = opts.OpenAIOrganizationID
+	}
+	openAI := openai.NewClientWithConfig(openAIConfig)
 
 	config, err := configs.Load(opts.CharacterType)
 	if err != nil {
