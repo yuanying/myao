@@ -1,6 +1,6 @@
 module github.com/yuanying/myao
 
-go 1.19
+go 1.20
 
 require (
 	github.com/sashabaranov/go-openai v1.5.5
