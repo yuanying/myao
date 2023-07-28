@@ -10,6 +10,8 @@ import (
 var (
 	//go:embed default.yaml
 	defaultConfig []byte
+	//go:embed llm_teacher.yaml
+	llmTeacherConfig []byte
 	//go:embed english_teacher.yaml
 	englishTeacherConfig []byte
 	//go:embed nyao.yaml
@@ -41,6 +43,8 @@ func Load(character string) (*Config, error) {
 	switch character {
 	case "english-teacher":
 		configYaml = englishTeacherConfig
+	case "llm-teacher":
+		configYaml = llmTeacherConfig
 	}
 
 	return load(configYaml)
