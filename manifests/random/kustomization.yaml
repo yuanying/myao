@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: myao
+
+images:
+- name: myao
+  newName: ghcr.io/yuanying/myao
+  newTag: latest
+
+resources:
+- src.yaml
+
+secretGenerator:
+- name: env
+  envs:
+  - secrets/.env

@@ -1,0 +1,91 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: myao
+  labels:
+    app: myao
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: webhook
+  namespace: myao
+  labels:
+    app: myao
+    component: webhook
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook
+  namespace: myao
+  labels:
+    app: myao
+    component: webhook
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  selector:
+    app: myao
+    component: webhook
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myao
+  namespace: myao
+  labels:
+    app: myao
+    component: webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: myao
+      component: webhook
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: myao
+        component: webhook
+    spec:
+      serviceAccountName: webhook
+      containers:
+      - name: webhook
+        image: myao
+        imagePullPolicy: Always
+        args:
+        - --max-delay-reply-period
+        - 1200s
+        - --handler
+        - socket
+        ports:
+        - name: http
+          containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+        envFrom:
+        - secretRef:
+            name: env
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            cpu: 50m
+            memory: 256Mi
