@@ -54,11 +54,7 @@ func (n *Nyao) FormatText(user, content string) string {
 	return fmt.Sprintf(n.nyaoConfig.TextFormat, user, content)
 }
 func (n *Nyao) Remember(role, content string) {
-	n.nyao.Remember(false, role, content)
-}
-
-func (n *Nyao) Summarize() {
-	// n.nyao.Summarize()
+	n.nyao.Remember(role, content)
 }
 
 func (n *Nyao) Reply(content string) (string, error) {
@@ -95,7 +91,7 @@ func (n *Nyao) nyaoReply(content string) <-chan result {
 	go func() {
 		defer close(res)
 
-		reply, err := n.nyao.Reply(false, "user", content)
+		reply, err := n.nyao.Reply("user", content)
 		res <- result{err: err, reply: reply}
 	}()
 	return res

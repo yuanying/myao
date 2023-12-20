@@ -115,6 +115,5 @@ func (h *Handler) reply(ctx context.Context, channel, thread, text string) {
 			klog.Errorf("Slack post message error: %v", err)
 			return
 		}
-		h.myao.Summarize()
 	}
 }

@@ -47,7 +47,7 @@ func New(opts *model.Opts) (*Myao, error) {
 		Config: config,
 	}
 	for _, msg := range config.InitConversations {
-		m.model.Remember(false, msg.Role, msg.Content)
+		m.model.Remember(msg.Role, msg.Content)
 	}
 
 	return m, nil
@@ -62,13 +62,9 @@ func (m *Myao) FormatText(user, content string) string {
 }
 
 func (m *Myao) Remember(role, content string) {
-	m.model.Remember(false, role, content)
-}
-
-func (m *Myao) Summarize() {
-	m.model.Summarize()
+	m.model.Remember(role, content)
 }
 
 func (m *Myao) Reply(content string) (string, error) {
-	return m.model.Reply(false, "user", content)
+	return m.model.Reply("user", content)
 }
