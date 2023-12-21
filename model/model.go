@@ -5,12 +5,18 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/pkoukk/tiktoken-go"
+	tiktoken_loader "github.com/pkoukk/tiktoken-go-loader"
 	"github.com/sashabaranov/go-openai"
 	"k8s.io/klog/v2"
 
 	"github.com/yuanying/myao/model/configs"
 	"github.com/yuanying/myao/utils"
 )
+
+func init() {
+	tiktoken.SetBpeLoader(tiktoken_loader.NewOfflineLoader())
+}
 
 type Opts struct {
 	OpenAIAccessToken    string

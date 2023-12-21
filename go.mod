@@ -3,6 +3,8 @@ module github.com/yuanying/myao
 go 1.20
 
 require (
+	github.com/pkoukk/tiktoken-go v0.1.6
+	github.com/pkoukk/tiktoken-go-loader v0.0.1
 	github.com/sashabaranov/go-openai v1.17.9
 	github.com/slack-go/slack v0.12.3
 	github.com/spf13/pflag v1.0.5
@@ -15,5 +17,4 @@ require (
 	github.com/go-logr/logr v1.2.0 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
-	github.com/pkoukk/tiktoken-go v0.1.6 // indirect
 )
