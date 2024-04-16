@@ -60,7 +60,7 @@ func (s *Shared) forget(role, content string) {
 	if s.systemNumTokens == 0 {
 		s.systemNumTokens = utils.NumTokensFromMessages(
 			[]openai.ChatCompletionMessage{{Role: "system", Content: s.SystemText}},
-			openai.GPT4TurboPreview,
+			openai.GPT4Turbo,
 		)
 		klog.Infof("systemNumTokens: %v", s.systemNumTokens)
 	}
@@ -69,7 +69,7 @@ func (s *Shared) forget(role, content string) {
 			Role:    role,
 			Content: content,
 		})
-	numTokens := utils.NumTokensFromMessages(messages, openai.GPT4TurboPreview)
+	numTokens := utils.NumTokensFromMessages(messages, openai.GPT4Turbo)
 	for (s.systemNumTokens + numTokens) > 3072 {
 		klog.Infof("Total tokens: %v, forgetting...", s.systemNumTokens+numTokens)
 		s.messages = s.messages[1:]
@@ -78,7 +78,7 @@ func (s *Shared) forget(role, content string) {
 				Role:    role,
 				Content: content,
 			})
-		numTokens = utils.NumTokensFromMessages(messages, openai.GPT4TurboPreview)
+		numTokens = utils.NumTokensFromMessages(messages, openai.GPT4Turbo)
 	}
 }
 
@@ -116,7 +116,7 @@ func (s *Shared) Reply(role, content string) (string, error) {
 	output, err := s.OpenAI.CreateChatCompletion(
 		context.TODO(),
 		openai.ChatCompletionRequest{
-			Model:       openai.GPT4TurboPreview,
+			Model:       openai.GPT4Turbo,
 			Messages:    messages,
 			Temperature: temperature,
 		},
@@ -147,7 +147,7 @@ func (s *Shared) ChatCompletions(messages []openai.ChatCompletionMessage) (*open
 	response, err := s.OpenAI.CreateChatCompletion(
 		context.TODO(),
 		openai.ChatCompletionRequest{
-			Model:       openai.GPT4TurboPreview,
+			Model:       openai.GPT4Turbo,
 			Messages:    messages,
 			Temperature: temperature,
 		},
