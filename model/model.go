@@ -14,6 +14,10 @@ import (
 	"github.com/yuanying/myao/utils"
 )
 
+const (
+	model = "gpt-4o"
+)
+
 func init() {
 	tiktoken.SetBpeLoader(tiktoken_loader.NewOfflineLoader())
 }
@@ -60,7 +64,7 @@ func (s *Shared) forget(role, content string) {
 	if s.systemNumTokens == 0 {
 		s.systemNumTokens = utils.NumTokensFromMessages(
 			[]openai.ChatCompletionMessage{{Role: "system", Content: s.SystemText}},
-			openai.GPT4Turbo,
+			model,
 		)
 		klog.Infof("systemNumTokens: %v", s.systemNumTokens)
 	}
@@ -69,8 +73,8 @@ func (s *Shared) forget(role, content string) {
 			Role:    role,
 			Content: content,
 		})
-	numTokens := utils.NumTokensFromMessages(messages, openai.GPT4Turbo)
-	for (s.systemNumTokens + numTokens) > 3072 {
+	numTokens := utils.NumTokensFromMessages(messages, model)
+	for (s.systemNumTokens + numTokens) > 8096 {
 		klog.Infof("Total tokens: %v, forgetting...", s.systemNumTokens+numTokens)
 		s.messages = s.messages[1:]
 		messages = append(s.messages,
@@ -78,7 +82,7 @@ func (s *Shared) forget(role, content string) {
 				Role:    role,
 				Content: content,
 			})
-		numTokens = utils.NumTokensFromMessages(messages, openai.GPT4Turbo)
+		numTokens = utils.NumTokensFromMessages(messages, model)
 	}
 }
 
@@ -116,7 +120,7 @@ func (s *Shared) Reply(role, content string) (string, error) {
 	output, err := s.OpenAI.CreateChatCompletion(
 		context.TODO(),
 		openai.ChatCompletionRequest{
-			Model:       openai.GPT4Turbo,
+			Model:       model,
 			Messages:    messages,
 			Temperature: temperature,
 		},
@@ -147,7 +151,7 @@ func (s *Shared) ChatCompletions(messages []openai.ChatCompletionMessage) (*open
 	response, err := s.OpenAI.CreateChatCompletion(
 		context.TODO(),
 		openai.ChatCompletionRequest{
-			Model:       openai.GPT4Turbo,
+			Model:       model,
 			Messages:    messages,
 			Temperature: temperature,
 		},
