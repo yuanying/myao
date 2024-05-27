@@ -3,7 +3,7 @@ module github.com/yuanying/myao
 go 1.20
 
 require (
-	github.com/pkoukk/tiktoken-go v0.1.6
+	github.com/pkoukk/tiktoken-go v0.1.7
 	github.com/pkoukk/tiktoken-go-loader v0.0.1
 	github.com/sashabaranov/go-openai v1.24.0
 	github.com/slack-go/slack v0.12.5
