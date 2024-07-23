@@ -55,6 +55,7 @@ func ChatCompletionMessage(role, content string, fileDataUrls []string) *openai.
 		})
 	}
 	for _, url := range fileDataUrls {
+		klog.Infof("url: %v", url)
 		imageUrl := openai.ChatMessageImageURL{
 			URL:    url,
 			Detail: openai.ImageURLDetailAuto,
