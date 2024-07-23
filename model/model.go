@@ -31,8 +31,8 @@ type Opts struct {
 
 type Model interface {
 	FormatText(user, content string) string
-	Remember(role, content string)
-	Reply(content string) (string, error)
+	Remember(role, content string, fileDataUrls []string)
+	Reply(content string, fileDataUrls []string) (string, error)
 	Name() string
 }
 
@@ -46,18 +46,39 @@ type Shared struct {
 	systemNumTokens int
 }
 
-func (s *Shared) Remember(role, content string) {
+func ChatCompletionMessage(role, content string, fileDataUrls []string) *openai.ChatCompletionMessage {
+	var multiContent []openai.ChatMessagePart
+	if content != "" {
+		multiContent = append(multiContent, openai.ChatMessagePart{
+			Type: openai.ChatMessagePartTypeText,
+			Text: content,
+		})
+	}
+	for _, url := range fileDataUrls {
+		imageUrl := openai.ChatMessageImageURL{
+			URL:    url,
+			Detail: openai.ImageURLDetailAuto,
+		}
+		multiContent = append(multiContent, openai.ChatMessagePart{
+			Type:     openai.ChatMessagePartTypeImageURL,
+			ImageURL: &imageUrl,
+		})
+	}
+
+	return &openai.ChatCompletionMessage{
+		Role:         role,
+		MultiContent: multiContent,
+	}
+}
+
+func (s *Shared) Remember(role, content string, fileDataUrls []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	klog.Infof("memories: %v", len(s.messages))
-	s.messages = append(s.messages,
-		openai.ChatCompletionMessage{
-			Role:    role,
-			Content: content,
-		})
+	s.messages = append(s.messages, *ChatCompletionMessage(role, content, fileDataUrls))
 }
 
-func (s *Shared) forget(role, content string) {
+func (s *Shared) forget(role, content string, fileDataUrls []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -68,13 +89,9 @@ func (s *Shared) forget(role, content string) {
 		)
 		klog.Infof("systemNumTokens: %v", s.systemNumTokens)
 	}
-	messages := append(s.messages,
-		openai.ChatCompletionMessage{
-			Role:    role,
-			Content: content,
-		})
+	messages := append(s.messages, *ChatCompletionMessage(role, content, fileDataUrls))
 	numTokens := utils.NumTokensFromMessages(messages, model)
-	for (s.systemNumTokens + numTokens) > 8096 {
+	for (s.systemNumTokens + numTokens) > 2*8096 {
 		klog.Infof("Total tokens: %v, forgetting...", s.systemNumTokens+numTokens)
 		s.messages = s.messages[1:]
 		messages = append(s.messages,
@@ -108,14 +125,12 @@ func (s *Shared) Messages() []openai.ChatCompletionMessage {
 	return rtn
 }
 
-func (s *Shared) Reply(role, content string) (string, error) {
+func (s *Shared) Reply(role, content string, fileDataUrls []string) (string, error) {
 	klog.Infof("Requesting chat completions...: %v", content)
-	s.forget(role, content)
+	s.forget(role, content, fileDataUrls)
 	temperature := s.Temperature
 	messages := s.Messages()
-	if content != "" {
-		messages = append(messages, openai.ChatCompletionMessage{Role: role, Content: content})
-	}
+	messages = append(messages, *ChatCompletionMessage(role, content, fileDataUrls))
 
 	output, err := s.OpenAI.CreateChatCompletion(
 		context.TODO(),
@@ -140,8 +155,8 @@ func (s *Shared) Reply(role, content string) (string, error) {
 	klog.Infof("Usage: prompt %v tokens, completions %v tokens", output.Usage.PromptTokens, output.Usage.CompletionTokens)
 
 	reply := output.Choices[0].Message
-	s.Remember(role, content)
-	s.Remember(reply.Role, reply.Content)
+	s.Remember(role, content, fileDataUrls)
+	s.Remember(reply.Role, reply.Content, []string{})
 
 	return reply.Content, nil
 }

@@ -53,13 +53,13 @@ func (n *Nyao) Name() string {
 func (n *Nyao) FormatText(user, content string) string {
 	return fmt.Sprintf(n.nyaoConfig.TextFormat, user, content)
 }
-func (n *Nyao) Remember(role, content string) {
-	n.nyao.Remember(role, content)
+func (n *Nyao) Remember(role, content string, fileDataUrls []string) {
+	n.nyao.Remember(role, content, fileDataUrls)
 }
 
-func (n *Nyao) Reply(content string) (string, error) {
-	nyao := n.nyaoReply(content)
-	sys := n.sysReply(content)
+func (n *Nyao) Reply(content string, fileDataUrls []string) (string, error) {
+	nyao := n.nyaoReply(content, fileDataUrls)
+	sys := n.sysReply(content, fileDataUrls)
 	nyaoRes := <-nyao
 	sysRes := <-sys
 
@@ -85,19 +85,19 @@ type result struct {
 	reply string
 }
 
-func (n *Nyao) nyaoReply(content string) <-chan result {
+func (n *Nyao) nyaoReply(content string, fileDataUrls []string) <-chan result {
 	res := make(chan result)
 
 	go func() {
 		defer close(res)
 
-		reply, err := n.nyao.Reply("user", content)
+		reply, err := n.nyao.Reply("user", content, fileDataUrls)
 		res <- result{err: err, reply: reply}
 	}()
 	return res
 }
 
-func (n *Nyao) sysReply(content string) <-chan result {
+func (n *Nyao) sysReply(content string, fileDataUrls []string) <-chan result {
 	res := make(chan result)
 
 	messages := []openai.ChatCompletionMessage{

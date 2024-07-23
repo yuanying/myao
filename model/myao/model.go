@@ -47,7 +47,7 @@ func New(opts *model.Opts) (*Myao, error) {
 		Config: config,
 	}
 	for _, msg := range config.InitConversations {
-		m.model.Remember(msg.Role, msg.Content)
+		m.model.Remember(msg.Role, msg.Content, []string{})
 	}
 
 	return m, nil
@@ -61,10 +61,10 @@ func (m *Myao) FormatText(user, content string) string {
 	return fmt.Sprintf(m.Config.TextFormat, user, content)
 }
 
-func (m *Myao) Remember(role, content string) {
-	m.model.Remember(role, content)
+func (m *Myao) Remember(role, content string, fileDataUrls []string) {
+	m.model.Remember(role, content, fileDataUrls)
 }
 
-func (m *Myao) Reply(content string) (string, error) {
-	return m.model.Reply("user", content)
+func (m *Myao) Reply(content string, fileDataUrls []string) (string, error) {
+	return m.model.Reply("user", content, fileDataUrls)
 }

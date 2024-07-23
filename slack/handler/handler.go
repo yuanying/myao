@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -33,6 +35,8 @@ type Handler struct {
 	// mu protects cancel from concurrent access.
 	mu     sync.Mutex
 	cancel context.CancelFunc
+
+	events chan *slackevents.MessageEvent
 }
 
 func New(opts *Opts) (*Handler, error) {
@@ -41,13 +45,18 @@ func New(opts *Opts) (*Handler, error) {
 		return nil, err
 	}
 
-	return &Handler{
+	h := &Handler{
 		users:               opts.SlackUsers,
 		myao:                opts.Myao,
 		myaoID:              bot.UserID,
 		slack:               opts.Slack,
 		maxDeplyReplyPeriod: opts.MaxDelayReplyPeriod,
-	}, nil
+		events:              make(chan *slackevents.MessageEvent, 100),
+	}
+
+	go h.processEvent()
+
+	return h, nil
 }
 
 func (h *Handler) Handle(event interface{}) {
@@ -56,8 +65,19 @@ func (h *Handler) Handle(event interface{}) {
 		klog.Infof("AppMentionEvent: user -> %v,  text -> %v", event.User, event.Text)
 	case *slackevents.MessageEvent:
 		klog.Infof("MessageEvent: bot-> %v, user-> %v, text -> %v", event.BotID, event.User, event.Text)
+		h.events <- event
+	}
+}
+
+func (h *Handler) processEvent() {
+	for event := range h.events {
 		h.Reply(event)
 	}
+}
+
+func convertToDataURL(fileContent []byte, mimeType string) string {
+	encoded := base64.StdEncoding.EncodeToString(fileContent)
+	return fmt.Sprintf("data:%s;base64,%s", mimeType, encoded)
 }
 
 func (h *Handler) Reply(event *slackevents.MessageEvent) {
@@ -66,6 +86,22 @@ func (h *Handler) Reply(event *slackevents.MessageEvent) {
 	}
 	if event.Text == "" {
 		return
+	}
+	fileDataUrls := make([]string, len(event.Files))
+	if event.Files != nil && len(fileDataUrls) > 0 {
+		for i, file := range event.Files {
+			if file.Filetype == "png" || file.Filetype == "jpg" || file.Filetype == "jpeg" || file.Filetype == "gif" {
+				var buf bytes.Buffer
+				err := h.slack.GetFile(file.URLPrivate, &buf)
+				if err != nil {
+					fmt.Printf("Failed to download: %v, %v\n", file.URLPrivate, err)
+					continue
+				}
+
+				dataURL := convertToDataURL(buf.Bytes(), file.Mimetype)
+				fileDataUrls[i] = dataURL
+			}
+		}
 	}
 	// event.ThreadTimeStamp
 
@@ -78,10 +114,10 @@ func (h *Handler) Reply(event *slackevents.MessageEvent) {
 	h.cancel = cancel
 	h.mu.Unlock()
 
-	go h.reply(ctx, event.Channel, event.ThreadTimeStamp, h.users.Text(h.myaoID, h.myao, event))
+	go h.reply(ctx, event.Channel, event.ThreadTimeStamp, h.users.Text(h.myaoID, h.myao, event), fileDataUrls)
 }
 
-func (h *Handler) reply(ctx context.Context, channel, thread, text string) {
+func (h *Handler) reply(ctx context.Context, channel, thread, text string, fileDataUrls []string) {
 	sec := 5
 
 	if !strings.Contains(text, h.myao.Name()) && !strings.Contains(text, fmt.Sprintf("@%v", h.myaoID)) {
@@ -93,10 +129,10 @@ func (h *Handler) reply(ctx context.Context, channel, thread, text string) {
 
 	select {
 	case <-ctx.Done():
-		h.myao.Remember("user", text)
+		h.myao.Remember("user", text, fileDataUrls)
 		klog.Infof("Skip message: %v", text)
 	case <-time.After(time.Duration(sec) * time.Second):
-		reply, err := h.myao.Reply(text)
+		reply, err := h.myao.Reply(text, fileDataUrls)
 		msgOpts := []slack.MsgOption{slack.MsgOptionText(reply, false)}
 		if thread != "" {
 			msgOpts = append(msgOpts, slack.MsgOptionTS(thread))
