@@ -50,6 +50,11 @@ func (n *Nyao) Name() string {
 	return n.nyao.Name
 }
 
+func (n *Nyao) Reset() (string, error) {
+	n.system.Reset()
+	return n.nyao.Reset()
+}
+
 func (n *Nyao) FormatText(user, content string) string {
 	return fmt.Sprintf(n.nyaoConfig.TextFormat, user, content)
 }

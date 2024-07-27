@@ -57,6 +57,10 @@ func (m *Myao) Name() string {
 	return m.model.Name
 }
 
+func (m *Myao) Reset() (string, error) {
+	return m.model.Reset()
+}
+
 func (m *Myao) FormatText(user, content string) string {
 	return fmt.Sprintf(m.Config.TextFormat, user, content)
 }

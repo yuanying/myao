@@ -33,6 +33,7 @@ type Model interface {
 	FormatText(user, content string) string
 	Remember(role, content string, fileDataUrls []string)
 	Reply(content string, fileDataUrls []string) (string, error)
+	Reset() (string, error)
 	Name() string
 }
 
@@ -55,7 +56,6 @@ func ChatCompletionMessage(role, content string, fileDataUrls []string) *openai.
 		})
 	}
 	for _, url := range fileDataUrls {
-		klog.Infof("url: %v", url)
 		imageUrl := openai.ChatMessageImageURL{
 			URL:    url,
 			Detail: openai.ImageURLDetailAuto,
@@ -77,6 +77,41 @@ func (s *Shared) Remember(role, content string, fileDataUrls []string) {
 	defer s.mu.Unlock()
 	klog.Infof("memories: %v", len(s.messages))
 	s.messages = append(s.messages, *ChatCompletionMessage(role, content, fileDataUrls))
+}
+
+func (s *Shared) Reset() (string, error) {
+	klog.Infof("Reset the old memories")
+	messages := s.Messages()
+	messages = append(messages, openai.ChatCompletionMessage{Role: "user", Content: s.Config.SummaryText})
+
+	output, err := s.OpenAI.CreateChatCompletion(
+		context.TODO(),
+		openai.ChatCompletionRequest{
+			Model:       model,
+			Messages:    messages,
+			Temperature: s.Temperature,
+		},
+	)
+	if err != nil {
+		klog.Errorf("OpenAI returns error: %v", err)
+		var openAIErr *openai.APIError
+		if errors.As(err, &openAIErr) {
+			klog.Infof("openAIErr Message: %v", err, openAIErr.Message)
+			if openAIErr.Code != nil {
+				klog.Infof("openAIErr Code: %v", openAIErr.Code)
+			}
+		}
+		return s.ErrorText, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	reply := output.Choices[0].Message
+	s.messages = []openai.ChatCompletionMessage{}
+	s.messages = append(s.messages, *ChatCompletionMessage(reply.Role, reply.Content, []string{}))
+
+	return reply.Content, nil
 }
 
 func (s *Shared) forget(role, content string, fileDataUrls []string) {

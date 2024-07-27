@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/pkoukk/tiktoken-go v0.1.7
-	github.com/pkoukk/tiktoken-go-loader v0.0.1
+	github.com/pkoukk/tiktoken-go-loader v0.0.2-0.20240522064338-c17e8bc0f699
 	github.com/sashabaranov/go-openai v1.27.0
 	github.com/slack-go/slack v0.13.1
 	github.com/spf13/pflag v1.0.5
