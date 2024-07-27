@@ -15,6 +15,7 @@ func ToPtr[T any](x T) *T {
 
 // OpenAI Cookbook: https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
 func NumTokensFromMessages(messages []openai.ChatCompletionMessage, model string) (numTokens int) {
+	log.Println(fmt.Sprintf("------------------------model: %s", model))
 	tkm, err := tiktoken.EncodingForModel(model)
 	if err != nil {
 		err = fmt.Errorf("encoding for model: %v", err)
@@ -29,7 +30,8 @@ func NumTokensFromMessages(messages []openai.ChatCompletionMessage, model string
 		"gpt-4-0314",
 		"gpt-4-32k-0314",
 		"gpt-4-0613",
-		"gpt-4-32k-0613":
+		"gpt-4-32k-0613",
+		"gpt-4o":
 		tokensPerMessage = 3
 		tokensPerName = 1
 	case "gpt-3.5-turbo-0301":
@@ -39,6 +41,9 @@ func NumTokensFromMessages(messages []openai.ChatCompletionMessage, model string
 		if strings.Contains(model, "gpt-3.5-turbo") {
 			log.Println("warning: gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613.")
 			return NumTokensFromMessages(messages, "gpt-3.5-turbo-0613")
+		} else if strings.Contains(model, "gpt-4o") {
+			log.Println("warning: gpt-4o may update over time. Returning num tokens assuming gpt-4-0613.")
+			return NumTokensFromMessages(messages, "gpt-4o")
 		} else if strings.Contains(model, "gpt-4") {
 			log.Println("warning: gpt-4 may update over time. Returning num tokens assuming gpt-4-0613.")
 			return NumTokensFromMessages(messages, "gpt-4-0613")
