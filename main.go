@@ -18,7 +18,6 @@ import (
 	"github.com/yuanying/myao/model/myao"
 	"github.com/yuanying/myao/model/nyao"
 	"github.com/yuanying/myao/slack/handler"
-	"github.com/yuanying/myao/slack/handler/event"
 	"github.com/yuanying/myao/slack/handler/socket"
 	"github.com/yuanying/myao/slack/users"
 )
@@ -116,22 +115,6 @@ func main() {
 	mux := http.NewServeMux()
 
 	switch handlerType {
-	case "event":
-		slackOpts := &event.Opts{
-			Opts: &handler.Opts{
-				Myao:                bot,
-				Slack:               slackCli,
-				SlackUsers:          slackUsers,
-				MaxDelayReplyPeriod: maxDelayReplyPeriod,
-			},
-			SlackSigningSecret: slackSigningSecret,
-		}
-		slackHandler, err := event.New(slackOpts)
-		if err != nil {
-			klog.Errorf("slackHandler initialization fails: %v", err)
-			return
-		}
-		mux.HandleFunc("/slack/events", slackHandler.Handle)
 	default:
 		s, err := socket.New(&handler.Opts{
 			Myao:                bot,

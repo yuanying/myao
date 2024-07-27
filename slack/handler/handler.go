@@ -35,8 +35,6 @@ type Handler struct {
 	// mu protects cancel from concurrent access.
 	mu     sync.Mutex
 	cancel context.CancelFunc
-
-	events chan *slackevents.MessageEvent
 }
 
 func New(opts *Opts) (*Handler, error) {
@@ -51,10 +49,7 @@ func New(opts *Opts) (*Handler, error) {
 		myaoID:              bot.UserID,
 		slack:               opts.Slack,
 		maxDeplyReplyPeriod: opts.MaxDelayReplyPeriod,
-		events:              make(chan *slackevents.MessageEvent, 100),
 	}
-
-	go h.processEvent()
 
 	return h, nil
 }
@@ -65,12 +60,6 @@ func (h *Handler) Handle(event interface{}) {
 		klog.Infof("AppMentionEvent: user -> %v,  text -> %v", event.User, event.Text)
 	case *slackevents.MessageEvent:
 		klog.Infof("MessageEvent: bot-> %v, user-> %v, text -> %v", event.BotID, event.User, event.Text)
-		h.events <- event
-	}
-}
-
-func (h *Handler) processEvent() {
-	for event := range h.events {
 		h.Reply(event)
 	}
 }
@@ -142,23 +131,7 @@ func (h *Handler) reply(ctx context.Context, channel, thread string, event *slac
 				}
 				return
 			} else if command[1] == "/reset" {
-				reply, err := h.myao.Reset()
-				msgOpts := []slack.MsgOption{slack.MsgOptionText(reply, false)}
-				if thread != "" {
-					msgOpts = append(msgOpts, slack.MsgOptionTS(thread))
-				}
-
-				if err != nil {
-					klog.Errorf("Myao reset error: %v", err)
-				}
-				if reply != "" {
-					if _, _, err := h.slack.PostMessage(channel, msgOpts...); err != nil {
-						klog.Errorf("Slack post message error: %v", err)
-						return
-					}
-				} else {
-					klog.Infof("reply doesn't exist")
-				}
+				h.ResetCommand(thread, channel)
 				return
 			}
 		}
@@ -184,4 +157,25 @@ func (h *Handler) reply(ctx context.Context, channel, thread string, event *slac
 			return
 		}
 	}
+}
+
+func (h *Handler) ResetCommand(thread string, channel string) {
+	reply, err := h.myao.Reset()
+	msgOpts := []slack.MsgOption{slack.MsgOptionText(reply, false)}
+	if thread != "" {
+		msgOpts = append(msgOpts, slack.MsgOptionTS(thread))
+	}
+
+	if err != nil {
+		klog.Errorf("Myao reset error: %v", err)
+	}
+	if reply != "" {
+		if _, _, err := h.slack.PostMessage(channel, msgOpts...); err != nil {
+			klog.Errorf("Slack post message error: %v", err)
+			return
+		}
+	} else {
+		klog.Infof("reply doesn't exist")
+	}
+	return
 }
