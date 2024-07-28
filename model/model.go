@@ -135,7 +135,7 @@ func (s *Shared) SaveSummary(summary string) {
 func (s *Shared) LoadSummary() {
 	s.musummary.Lock()
 	defer s.musummary.Unlock()
-	summary, err := os.ReadFile("summary.txt")
+	summary, err := os.ReadFile(filepath.Join(s.Opts.PersistentDir, summaryFile))
 	if err != nil {
 		klog.Errorf("Failed to read summary: %v", err)
 		return
