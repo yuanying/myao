@@ -60,6 +60,10 @@ spec:
         component: webhook
     spec:
       serviceAccountName: webhook
+      volumes:
+      - name: memory
+        persistentVolumeClaim:
+          claimName: myao
       containers:
       - name: webhook
         image: myao
@@ -69,6 +73,8 @@ spec:
         - 1200s
         - --handler
         - socket
+        - --persistent-dir
+        - /myao
         ports:
         - name: http
           containerPort: 8080
@@ -89,3 +95,18 @@ spec:
           limits:
             cpu: 50m
             memory: 256Mi
+        volumeMounts:
+        - mountPath: /myao
+          name: memory
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myao
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: "1Gi"
+  storageClassName: silver
