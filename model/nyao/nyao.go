@@ -32,22 +32,34 @@ func New(opts *model.Opts) (*Nyao, error) {
 		return nil, err
 	}
 
-	return &Nyao{
+	n := &Nyao{
 		nyao: &model.Shared{
 			Config: nyao,
 			OpenAI: openAI,
+			Opts:   opts,
 		},
 		system: &model.Shared{
 			Config: system,
 			OpenAI: openAI,
+			Opts:   opts,
 		},
 		nyaoConfig:   nyao,
 		systemConfig: system,
-	}, nil
+	}
+	n.LoadSummary()
+	return n, nil
 }
 
 func (n *Nyao) Name() string {
 	return n.nyao.Name
+}
+
+func (n *Nyao) SaveSummary(summary string) {
+	n.nyao.SaveSummary(summary)
+}
+
+func (n *Nyao) LoadSummary() {
+	n.nyao.LoadSummary()
 }
 
 func (n *Nyao) Reset() (string, error) {

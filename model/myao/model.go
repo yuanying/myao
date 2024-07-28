@@ -3,7 +3,6 @@ package myao
 import (
 	_ "embed"
 	"fmt"
-	"strings"
 
 	"github.com/sashabaranov/go-openai"
 	"k8s.io/klog/v2"
@@ -32,20 +31,15 @@ func New(opts *model.Opts) (*Myao, error) {
 		return nil, err
 	}
 
-	var sb strings.Builder
-	for _, v := range opts.UsersMap {
-		sb.WriteString(fmt.Sprintf("- %v\n", v))
-	}
-	systemText := fmt.Sprintf(config.SystemText, sb.String())
-	config.SystemText = systemText
-
 	m := &Myao{
 		model: &model.Shared{
 			Config: config,
 			OpenAI: openAI,
+			Opts:   opts,
 		},
 		Config: config,
 	}
+	m.LoadSummary()
 	for _, msg := range config.InitConversations {
 		m.model.Remember(msg.Role, msg.Content, []string{})
 	}
@@ -55,6 +49,14 @@ func New(opts *model.Opts) (*Myao, error) {
 
 func (m *Myao) Name() string {
 	return m.model.Name
+}
+
+func (m *Myao) SaveSummary(summary string) {
+	m.model.SaveSummary(summary)
+}
+
+func (m *Myao) LoadSummary() {
+	m.model.LoadSummary()
 }
 
 func (m *Myao) Reset() (string, error) {

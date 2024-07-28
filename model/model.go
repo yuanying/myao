@@ -3,6 +3,8 @@ package model
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/pkoukk/tiktoken-go"
@@ -11,11 +13,11 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/yuanying/myao/model/configs"
-	"github.com/yuanying/myao/utils"
 )
 
 const (
-	model = "gpt-4o"
+	model       = "gpt-4o"
+	summaryFile = "summary.txt"
 )
 
 func init() {
@@ -27,6 +29,7 @@ type Opts struct {
 	OpenAIOrganizationID string
 	CharacterType        string
 	UsersMap             map[string]string
+	PersistentDir        string
 }
 
 type Model interface {
@@ -35,15 +38,20 @@ type Model interface {
 	Reply(content string, fileDataUrls []string) (string, error)
 	Reset() (string, error)
 	Name() string
+	SaveSummary(summary string)
+	LoadSummary()
 }
 
 type Shared struct {
 	*configs.Config
 	OpenAI *openai.Client
+	Opts   *Opts
 
 	// mu protects memories from concurrent access.
-	mu              sync.RWMutex
-	messages        []openai.ChatCompletionMessage
+	mu        sync.RWMutex
+	messages  []openai.ChatCompletionMessage
+	musummary sync.RWMutex
+
 	systemNumTokens int
 }
 
@@ -104,39 +112,35 @@ func (s *Shared) Reset() (string, error) {
 		return s.ErrorText, err
 	}
 
+	reply := output.Choices[0].Message
+	s.SaveSummary(reply.Content)
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	reply := output.Choices[0].Message
 	s.messages = []openai.ChatCompletionMessage{}
 	s.messages = append(s.messages, *ChatCompletionMessage(reply.Role, reply.Content, []string{}))
 
 	return reply.Content, nil
 }
 
-func (s *Shared) forget(role, content string, fileDataUrls []string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *Shared) SaveSummary(summary string) {
+	s.musummary.Lock()
+	defer s.musummary.Unlock()
+	if err := os.WriteFile(filepath.Join(s.Opts.PersistentDir, summaryFile), []byte(summary), 0644); err != nil {
+		klog.Errorf("Failed to write summary: %v", err)
+	}
+}
 
-	if s.systemNumTokens == 0 {
-		s.systemNumTokens = utils.NumTokensFromMessages(
-			[]openai.ChatCompletionMessage{{Role: "system", Content: s.SystemText}},
-			model,
-		)
-		klog.Infof("systemNumTokens: %v", s.systemNumTokens)
+func (s *Shared) LoadSummary() {
+	s.musummary.Lock()
+	defer s.musummary.Unlock()
+	summary, err := os.ReadFile("summary.txt")
+	if err != nil {
+		klog.Errorf("Failed to read summary: %v", err)
+		return
 	}
-	messages := append(s.messages, *ChatCompletionMessage(role, content, fileDataUrls))
-	numTokens := utils.NumTokensFromMessages(messages, model)
-	for (s.systemNumTokens + numTokens) > 2*8096 {
-		klog.Infof("Total tokens: %v, forgetting...", s.systemNumTokens+numTokens)
-		s.messages = s.messages[1:]
-		messages = append(s.messages,
-			openai.ChatCompletionMessage{
-				Role:    role,
-				Content: content,
-			})
-		numTokens = utils.NumTokensFromMessages(messages, model)
-	}
+	s.Remember("assistant", string(summary), []string{})
 }
 
 func (s *Shared) Forget(num int) {
@@ -163,7 +167,6 @@ func (s *Shared) Messages() []openai.ChatCompletionMessage {
 
 func (s *Shared) Reply(role, content string, fileDataUrls []string) (string, error) {
 	klog.Infof("Requesting chat completions...: %v", content)
-	s.forget(role, content, fileDataUrls)
 	temperature := s.Temperature
 	messages := s.Messages()
 	messages = append(messages, *ChatCompletionMessage(role, content, fileDataUrls))
@@ -193,6 +196,10 @@ func (s *Shared) Reply(role, content string, fileDataUrls []string) (string, err
 	reply := output.Choices[0].Message
 	s.Remember(role, content, fileDataUrls)
 	s.Remember(reply.Role, reply.Content, []string{})
+
+	if output.Usage.TotalTokens > 2*8096 {
+		go s.Reset()
+	}
 
 	return reply.Content, nil
 }

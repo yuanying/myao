@@ -38,6 +38,7 @@ var (
 	handlerType         string
 	character           string
 	maxDelayReplyPeriod time.Duration
+	persistentDir       string
 
 	// Options for Event type handler
 	shutdownDelayPeriod time.Duration
@@ -63,6 +64,7 @@ func init() {
 	pflag.StringVar(&character, "character", "default", "The character of this Chatbot.")
 	pflag.StringVar(&handlerType, "handler", "socket", "Type of event handler.")
 	pflag.DurationVar(&maxDelayReplyPeriod, "max-delay-reply-period", 600*time.Second, "set the time (in seconds) that the myao will wait before replying")
+	pflag.StringVar(&persistentDir, "persistent-dir", "./", "Set the directory to store persistent data")
 
 	pflag.StringVar(&bindAddress, "bind-address", ":8080", "Address on which to expose web interface.")
 	pflag.DurationVar(&shutdownDelayPeriod, "shutdown-wait-period", 1*time.Second, "set the time (in seconds) that the server will wait before initiating shutdown")
@@ -99,6 +101,7 @@ func main() {
 		OpenAIOrganizationID: openAIOrganizationID,
 		UsersMap:             slackUsers.Users,
 		CharacterType:        character,
+		PersistentDir:        persistentDir,
 	}
 
 	switch character {
